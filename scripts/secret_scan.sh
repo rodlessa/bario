@@ -243,7 +243,8 @@ function suppressed(v,   lv) {
 
     lc = tolower(content)
     re = "(^|[^a-z0-9])(api[_-]?key|apikey|secret|token|password|passwd|pwd|access[_-]?key|client[_-]?secret|auth[_-]?token)[\"']?[ \t]*[=:][ \t]*"
-    if (!match(lc, re)) next
+    re_key = "(^|[ \t\"'])key[\"']?[ \t]*=[ \t]*"
+    if (!match(lc, re) && !match(lc, re_key)) next
 
     keyraw = substr(content, RSTART, RLENGTH)
     quote = ""
