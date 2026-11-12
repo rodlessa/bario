@@ -1,4 +1,4 @@
-// Command follows manages the directed follower graph between Chirp accounts.
+// Command follows manages the directed follower graph between Bario accounts.
 package main
 
 import (
@@ -10,11 +10,11 @@ import (
 	"strings"
 	"time"
 
-	"chirp/pkg/authclient"
-	"chirp/pkg/db"
-	chirphttp "chirp/pkg/http"
-	"chirp/pkg/jwt"
-	"chirp/pkg/metrics"
+	"bario/pkg/authclient"
+	"bario/pkg/db"
+	bariohttp "bario/pkg/http"
+	"bario/pkg/jwt"
+	"bario/pkg/metrics"
 )
 
 const schema = "follows"
@@ -39,7 +39,7 @@ func main() {
 }
 
 func run() error {
-	ctx, stop := chirphttp.SignalContext()
+	ctx, stop := bariohttp.SignalContext()
 	defer stop()
 
 	pool, err := db.Connect(ctx, os.Getenv("DATABASE_URL"), schema)
@@ -71,18 +71,18 @@ func run() error {
 		auth:   authclient.New(env("AUTH_URL", "http://localhost:8081")),
 	}
 	m := metrics.New("follows")
-	router := chirphttp.NewRouter(m)
+	router := bariohttp.NewRouter(m)
 	srv.registerRoutes(router)
 
-	return chirphttp.Serve(ctx, ":"+env("HTTP_PORT", "8080"), router.Handler(), ":"+env("METRICS_PORT", "9090"), m.Handler())
+	return bariohttp.Serve(ctx, ":"+env("HTTP_PORT", "8080"), router.Handler(), ":"+env("METRICS_PORT", "9090"), m.Handler())
 }
 
-func (s *server) registerRoutes(router *chirphttp.Router) {
-	router.Get("/healthz", "health", chirphttp.Healthy)
-	router.Get("/api/follows/healthz", "health", chirphttp.Healthy)
+func (s *server) registerRoutes(router *bariohttp.Router) {
+	router.Get("/healthz", "health", bariohttp.Healthy)
+	router.Get("/api/follows/healthz", "health", bariohttp.Healthy)
 
-	follow := chirphttp.RequireAuth(s.tokens, s.handleFollow)
-	unfollow := chirphttp.RequireAuth(s.tokens, s.handleUnfollow)
+	follow := bariohttp.RequireAuth(s.tokens, s.handleFollow)
+	unfollow := bariohttp.RequireAuth(s.tokens, s.handleUnfollow)
 	router.Post("/users/{id}/follow", "follow_user", follow)
 	router.Delete("/users/{id}/follow", "unfollow_user", unfollow)
 	router.Post("/api/follows/users/{id}/follow", "follow_user", follow)
@@ -100,7 +100,7 @@ func (s *server) handleFollow(w http.ResponseWriter, r *http.Request, claims *jw
 		return
 	}
 	if followeeID == claims.UserID {
-		chirphttp.WriteError(w, http.StatusBadRequest, "you cannot follow yourself")
+		bariohttp.WriteError(w, http.StatusBadRequest, "you cannot follow yourself")
 		return
 	}
 
@@ -112,11 +112,11 @@ func (s *server) handleFollow(w http.ResponseWriter, r *http.Request, claims *jw
 	)
 	if err != nil {
 		slog.Error("follow user", "error", err, "follower", claims.UserID, "followee", followeeID)
-		chirphttp.WriteError(w, http.StatusInternalServerError, "could not follow user")
+		bariohttp.WriteError(w, http.StatusInternalServerError, "could not follow user")
 		return
 	}
 
-	chirphttp.WriteJSON(w, http.StatusCreated, map[string]bool{"following": true})
+	bariohttp.WriteJSON(w, http.StatusCreated, map[string]bool{"following": true})
 }
 
 func (s *server) handleUnfollow(w http.ResponseWriter, r *http.Request, claims *jwt.Claims) {
@@ -131,7 +131,7 @@ func (s *server) handleUnfollow(w http.ResponseWriter, r *http.Request, claims *
 	)
 	if err != nil {
 		slog.Error("unfollow user", "error", err, "follower", claims.UserID, "followee", followeeID)
-		chirphttp.WriteError(w, http.StatusInternalServerError, "could not unfollow user")
+		bariohttp.WriteError(w, http.StatusInternalServerError, "could not unfollow user")
 		return
 	}
 
@@ -159,7 +159,7 @@ func (s *server) listRelations(w http.ResponseWriter, r *http.Request, filterCol
 	rows, err := s.db.QueryContext(r.Context(), query, userID)
 	if err != nil {
 		slog.Error("list relations", "error", err, "user_id", userID)
-		chirphttp.WriteError(w, http.StatusInternalServerError, "could not load users")
+		bariohttp.WriteError(w, http.StatusInternalServerError, "could not load users")
 		return
 	}
 	defer rows.Close()
@@ -169,14 +169,14 @@ func (s *server) listRelations(w http.ResponseWriter, r *http.Request, filterCol
 		var id int64
 		if err := rows.Scan(&id); err != nil {
 			slog.Error("scan relation", "error", err)
-			chirphttp.WriteError(w, http.StatusInternalServerError, "could not load users")
+			bariohttp.WriteError(w, http.StatusInternalServerError, "could not load users")
 			return
 		}
 		ids = append(ids, id)
 	}
 	if err := rows.Err(); err != nil {
 		slog.Error("iterate relations", "error", err)
-		chirphttp.WriteError(w, http.StatusInternalServerError, "could not load users")
+		bariohttp.WriteError(w, http.StatusInternalServerError, "could not load users")
 		return
 	}
 
@@ -185,13 +185,13 @@ func (s *server) listRelations(w http.ResponseWriter, r *http.Request, filterCol
 		users = append(users, userRef{ID: id, Username: s.auth.Username(r.Context(), id)})
 	}
 
-	chirphttp.WriteJSON(w, http.StatusOK, users)
+	bariohttp.WriteJSON(w, http.StatusOK, users)
 }
 
 func parseID(w http.ResponseWriter, raw string) (int64, bool) {
 	id, err := strconv.ParseInt(raw, 10, 64)
 	if err != nil || id <= 0 {
-		chirphttp.WriteError(w, http.StatusBadRequest, "invalid id")
+		bariohttp.WriteError(w, http.StatusBadRequest, "invalid id")
 		return 0, false
 	}
 	return id, true

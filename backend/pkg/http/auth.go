@@ -1,9 +1,9 @@
-package chirphttp
+package bariohttp
 
 import (
 	"net/http"
 
-	"chirp/pkg/jwt"
+	"bario/pkg/jwt"
 )
 
 // AuthedHandler is a handler that receives the verified token claims.

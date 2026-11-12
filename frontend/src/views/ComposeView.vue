@@ -69,7 +69,7 @@ async function submit(): Promise<void> {
     clearFile()
     await router.push(`/post/${created.id}`)
   } catch (err) {
-    error.value = errorMessage(err, 'Could not publish your chirp')
+    error.value = errorMessage(err, 'Could not publish your bario')
   } finally {
     submitting.value = false
   }
@@ -81,7 +81,7 @@ onBeforeUnmount(clearFile)
 <template>
   <section class="page-head">
     <div>
-      <h1>New chirp</h1>
+      <h1>New bario</h1>
       <p class="muted">Say something short. Attach an image if you like.</p>
     </div>
   </section>
@@ -93,7 +93,7 @@ onBeforeUnmount(clearFile)
       name="content"
       rows="5"
       placeholder="What is happening?"
-      aria-label="Chirp content"
+      aria-label="Bario content"
     ></textarea>
 
     <div class="compose-toolbar">
@@ -113,7 +113,7 @@ onBeforeUnmount(clearFile)
 
     <div class="compose-actions">
       <button type="submit" class="button primary" :disabled="!canSubmit">
-        {{ submitting ? 'Publishing…' : 'Publish chirp' }}
+        {{ submitting ? 'Publishing…' : 'Publish bario' }}
       </button>
     </div>
   </form>

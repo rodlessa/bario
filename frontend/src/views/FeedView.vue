@@ -59,14 +59,14 @@ watch(isAuthenticated, (authenticated) => {
   <section class="page-head">
     <div>
       <h1>Home</h1>
-      <p class="muted">Chirps from the people you follow.</p>
+      <p class="muted">Barios from the people you follow.</p>
     </div>
-    <RouterLink v-if="isAuthenticated" class="button primary" to="/compose">New chirp</RouterLink>
+    <RouterLink v-if="isAuthenticated" class="button primary" to="/compose">New bario</RouterLink>
   </section>
 
   <section v-if="!isAuthenticated" class="panel welcome">
     <h2>Your feed lives here</h2>
-    <p class="muted">Log in to follow people and read their chirps.</p>
+    <p class="muted">Log in to follow people and read their barios.</p>
     <div class="button-row">
       <RouterLink class="button primary" to="/login">Log in</RouterLink>
       <RouterLink class="button ghost" to="/register">Create account</RouterLink>
@@ -79,7 +79,7 @@ watch(isAuthenticated, (authenticated) => {
     <template v-else>
       <PostList
         :posts="posts"
-        :empty-text="loaded ? 'Your feed is empty. Open a profile and follow someone to fill it.' : 'No chirps yet.'"
+        :empty-text="loaded ? 'Your feed is empty. Open a profile and follow someone to fill it.' : 'No barios yet.'"
       />
       <div v-if="cursor" class="load-more">
         <button type="button" class="button" :disabled="loadingMore" @click="loadFeed(false)">

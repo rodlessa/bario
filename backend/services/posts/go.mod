@@ -1,9 +1,9 @@
-module chirp/service/posts
+module bario/service/posts
 
 go 1.24.0
 
 require (
-	chirp/pkg v0.0.0
+	bario/pkg v0.0.0
 	github.com/lib/pq v1.10.9
 )
 
@@ -21,4 +21,4 @@ require (
 	google.golang.org/protobuf v1.34.2 // indirect
 )
 
-replace chirp/pkg => ../../pkg
+replace bario/pkg => ../../pkg

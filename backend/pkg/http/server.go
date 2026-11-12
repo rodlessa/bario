@@ -1,4 +1,4 @@
-package chirphttp
+package bariohttp
 
 import (
 	"context"

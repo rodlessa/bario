@@ -1,9 +1,9 @@
-module chirp/service/auth
+module bario/service/auth
 
 go 1.24.0
 
 require (
-	chirp/pkg v0.0.0
+	bario/pkg v0.0.0
 	golang.org/x/crypto v0.31.0
 )
 
@@ -22,4 +22,4 @@ require (
 	google.golang.org/protobuf v1.34.2 // indirect
 )
 
-replace chirp/pkg => ../../pkg
+replace bario/pkg => ../../pkg

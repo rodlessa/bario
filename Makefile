@@ -1,11 +1,11 @@
 SHELL := /bin/sh
 
-REGISTRY ?= chirp
+REGISTRY ?= bario
 TAG ?= latest
-NAMESPACE ?= chirp
-RELEASE ?= chirp
+NAMESPACE ?= bario
+RELEASE ?= bario
 HELM ?= helm
-CHART := deploy/chirp
+CHART := deploy/bario
 SERVICES := auth posts uploads follows
 GO_PACKAGES := ./pkg/... ./services/auth/... ./services/posts/... ./services/uploads/... ./services/follows/...
 IMAGE_SETS = \
@@ -63,4 +63,5 @@ helm-lint:
 	$(HELM) lint $(CHART)
 
 clean:
+	rm -f backend/services/*/auth backend/services/*/posts backend/services/*/uploads backend/services/*/follows
 	rm -rf frontend/dist

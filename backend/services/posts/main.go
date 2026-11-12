@@ -1,4 +1,4 @@
-// Command posts is the Chirp timeline service. It stores posts, serves single
+// Command posts is the Bario timeline service. It stores posts, serves single
 // posts and user profiles' posts, and builds the home feed from the accounts the
 // caller follows.
 package main
@@ -21,11 +21,11 @@ import (
 
 	"github.com/lib/pq"
 
-	"chirp/pkg/authclient"
-	"chirp/pkg/db"
-	chirphttp "chirp/pkg/http"
-	"chirp/pkg/jwt"
-	"chirp/pkg/metrics"
+	"bario/pkg/authclient"
+	"bario/pkg/db"
+	bariohttp "bario/pkg/http"
+	"bario/pkg/jwt"
+	"bario/pkg/metrics"
 )
 
 const (
@@ -72,7 +72,7 @@ func main() {
 }
 
 func run() error {
-	ctx, stop := chirphttp.SignalContext()
+	ctx, stop := bariohttp.SignalContext()
 	defer stop()
 
 	pool, err := db.Connect(ctx, os.Getenv("DATABASE_URL"), schema)
@@ -107,22 +107,22 @@ func run() error {
 	}
 
 	m := metrics.New("posts")
-	router := chirphttp.NewRouter(m)
+	router := bariohttp.NewRouter(m)
 	srv.registerRoutes(router)
 
-	return chirphttp.Serve(ctx, ":"+env("HTTP_PORT", "8080"), router.Handler(), ":"+env("METRICS_PORT", "9090"), m.Handler())
+	return bariohttp.Serve(ctx, ":"+env("HTTP_PORT", "8080"), router.Handler(), ":"+env("METRICS_PORT", "9090"), m.Handler())
 }
 
-func (s *server) registerRoutes(router *chirphttp.Router) {
-	router.Get("/healthz", "health", chirphttp.Healthy)
-	router.Get("/api/posts/healthz", "health", chirphttp.Healthy)
+func (s *server) registerRoutes(router *bariohttp.Router) {
+	router.Get("/healthz", "health", bariohttp.Healthy)
+	router.Get("/api/posts/healthz", "health", bariohttp.Healthy)
 
-	createPost := chirphttp.RequireAuth(s.tokens, s.handleCreatePost)
+	createPost := bariohttp.RequireAuth(s.tokens, s.handleCreatePost)
 	router.Post("/posts", "create_post", createPost)
 	router.Post("/api/posts", "create_post", createPost)
 	router.Post("/api/posts/posts", "create_post", createPost)
 
-	getFeed := chirphttp.RequireAuth(s.tokens, s.handleFeed)
+	getFeed := bariohttp.RequireAuth(s.tokens, s.handleFeed)
 	router.Get("/feed", "get_feed", getFeed)
 	router.Get("/api/posts/feed", "get_feed", getFeed)
 
@@ -141,17 +141,17 @@ type createPostRequest struct {
 
 func (s *server) handleCreatePost(w http.ResponseWriter, r *http.Request, claims *jwt.Claims) {
 	var req createPostRequest
-	if !chirphttp.DecodeJSON(w, r, &req) {
+	if !bariohttp.DecodeJSON(w, r, &req) {
 		return
 	}
 
 	content := strings.TrimSpace(req.Content)
 	if content == "" {
-		chirphttp.WriteError(w, http.StatusBadRequest, "content must not be empty")
+		bariohttp.WriteError(w, http.StatusBadRequest, "content must not be empty")
 		return
 	}
 	if utf8.RuneCountInString(content) > maxContent {
-		chirphttp.WriteError(w, http.StatusBadRequest, "content must be at most 280 characters")
+		bariohttp.WriteError(w, http.StatusBadRequest, "content must be at most 280 characters")
 		return
 	}
 
@@ -160,7 +160,7 @@ func (s *server) handleCreatePost(w http.ResponseWriter, r *http.Request, claims
 		trimmed := strings.TrimSpace(*req.ImageID)
 		if trimmed != "" {
 			if !imageIDPattern.MatchString(trimmed) {
-				chirphttp.WriteError(w, http.StatusBadRequest, "invalid image_id")
+				bariohttp.WriteError(w, http.StatusBadRequest, "invalid image_id")
 				return
 			}
 			imageID = sql.NullString{String: trimmed, Valid: true}
@@ -176,7 +176,7 @@ func (s *server) handleCreatePost(w http.ResponseWriter, r *http.Request, claims
 	).Scan(&created.ID, &created.CreatedAt)
 	if err != nil {
 		slog.Error("insert post", "error", err)
-		chirphttp.WriteError(w, http.StatusInternalServerError, "could not create post")
+		bariohttp.WriteError(w, http.StatusInternalServerError, "could not create post")
 		return
 	}
 	if imageID.Valid {
@@ -184,7 +184,7 @@ func (s *server) handleCreatePost(w http.ResponseWriter, r *http.Request, claims
 	}
 	created.Author = author{ID: claims.UserID, Username: claims.Username}
 
-	chirphttp.WriteJSON(w, http.StatusCreated, created)
+	bariohttp.WriteJSON(w, http.StatusCreated, created)
 }
 
 func (s *server) handleGetPost(w http.ResponseWriter, r *http.Request) {
@@ -198,18 +198,18 @@ func (s *server) handleGetPost(w http.ResponseWriter, r *http.Request) {
 		 FROM posts.posts WHERE id = $1`, id)
 	found, err := scanPost(row)
 	if errors.Is(err, sql.ErrNoRows) {
-		chirphttp.WriteError(w, http.StatusNotFound, "post not found")
+		bariohttp.WriteError(w, http.StatusNotFound, "post not found")
 		return
 	}
 	if err != nil {
 		slog.Error("get post", "error", err)
-		chirphttp.WriteError(w, http.StatusInternalServerError, "could not load post")
+		bariohttp.WriteError(w, http.StatusInternalServerError, "could not load post")
 		return
 	}
 
 	posts := []post{found}
 	s.attachAuthors(r.Context(), posts)
-	chirphttp.WriteJSON(w, http.StatusOK, posts[0])
+	bariohttp.WriteJSON(w, http.StatusOK, posts[0])
 }
 
 func (s *server) handleListUserPosts(w http.ResponseWriter, r *http.Request) {
@@ -232,7 +232,7 @@ func (s *server) handleListUserPosts(w http.ResponseWriter, r *http.Request) {
 	)
 	if err != nil {
 		slog.Error("list user posts", "error", err)
-		chirphttp.WriteError(w, http.StatusInternalServerError, "could not load posts")
+		bariohttp.WriteError(w, http.StatusInternalServerError, "could not load posts")
 		return
 	}
 	defer rows.Close()
@@ -240,12 +240,12 @@ func (s *server) handleListUserPosts(w http.ResponseWriter, r *http.Request) {
 	posts, err := collectPosts(rows)
 	if err != nil {
 		slog.Error("scan user posts", "error", err)
-		chirphttp.WriteError(w, http.StatusInternalServerError, "could not load posts")
+		bariohttp.WriteError(w, http.StatusInternalServerError, "could not load posts")
 		return
 	}
 	s.attachAuthors(r.Context(), posts)
 
-	chirphttp.WriteJSON(w, http.StatusOK, postList{Posts: posts, NextCursor: nextCursor(posts, limit)})
+	bariohttp.WriteJSON(w, http.StatusOK, postList{Posts: posts, NextCursor: nextCursor(posts, limit)})
 }
 
 func (s *server) handleFeed(w http.ResponseWriter, r *http.Request, claims *jwt.Claims) {
@@ -257,11 +257,11 @@ func (s *server) handleFeed(w http.ResponseWriter, r *http.Request, claims *jwt.
 	followedIDs, err := s.follows.FollowingIDs(r.Context(), claims.UserID)
 	if err != nil {
 		slog.Error("load following", "error", err, "user_id", claims.UserID)
-		chirphttp.WriteError(w, http.StatusBadGateway, "could not load the accounts you follow")
+		bariohttp.WriteError(w, http.StatusBadGateway, "could not load the accounts you follow")
 		return
 	}
 	if len(followedIDs) == 0 {
-		chirphttp.WriteJSON(w, http.StatusOK, postList{Posts: []post{}, NextCursor: nil})
+		bariohttp.WriteJSON(w, http.StatusOK, postList{Posts: []post{}, NextCursor: nil})
 		return
 	}
 
@@ -275,7 +275,7 @@ func (s *server) handleFeed(w http.ResponseWriter, r *http.Request, claims *jwt.
 	)
 	if err != nil {
 		slog.Error("load feed", "error", err)
-		chirphttp.WriteError(w, http.StatusInternalServerError, "could not load feed")
+		bariohttp.WriteError(w, http.StatusInternalServerError, "could not load feed")
 		return
 	}
 	defer rows.Close()
@@ -283,12 +283,12 @@ func (s *server) handleFeed(w http.ResponseWriter, r *http.Request, claims *jwt.
 	posts, err := collectPosts(rows)
 	if err != nil {
 		slog.Error("scan feed", "error", err)
-		chirphttp.WriteError(w, http.StatusInternalServerError, "could not load feed")
+		bariohttp.WriteError(w, http.StatusInternalServerError, "could not load feed")
 		return
 	}
 	s.attachAuthors(r.Context(), posts)
 
-	chirphttp.WriteJSON(w, http.StatusOK, postList{Posts: posts, NextCursor: nextCursor(posts, limit)})
+	bariohttp.WriteJSON(w, http.StatusOK, postList{Posts: posts, NextCursor: nextCursor(posts, limit)})
 }
 
 // attachAuthors resolves display names through the auth service, caching each
@@ -341,7 +341,7 @@ func parsePagination(w http.ResponseWriter, r *http.Request) (limit int, cursor 
 	if raw := r.URL.Query().Get("limit"); raw != "" {
 		value, err := strconv.Atoi(raw)
 		if err != nil || value < 1 || value > maxLimit {
-			chirphttp.WriteError(w, http.StatusBadRequest, "limit must be between 1 and 100")
+			bariohttp.WriteError(w, http.StatusBadRequest, "limit must be between 1 and 100")
 			return 0, 0, false
 		}
 		limit = value
@@ -349,7 +349,7 @@ func parsePagination(w http.ResponseWriter, r *http.Request) (limit int, cursor 
 	if raw := r.URL.Query().Get("cursor"); raw != "" {
 		value, err := strconv.ParseInt(raw, 10, 64)
 		if err != nil || value < 0 {
-			chirphttp.WriteError(w, http.StatusBadRequest, "invalid cursor")
+			bariohttp.WriteError(w, http.StatusBadRequest, "invalid cursor")
 			return 0, 0, false
 		}
 		cursor = value
@@ -368,7 +368,7 @@ func nextCursor(posts []post, limit int) *string {
 func parseID(w http.ResponseWriter, raw string) (int64, bool) {
 	id, err := strconv.ParseInt(raw, 10, 64)
 	if err != nil || id <= 0 {
-		chirphttp.WriteError(w, http.StatusBadRequest, "invalid id")
+		bariohttp.WriteError(w, http.StatusBadRequest, "invalid id")
 		return 0, false
 	}
 	return id, true

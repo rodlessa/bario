@@ -2,7 +2,7 @@ import { ref, watch } from 'vue'
 
 export type LayoutMode = 'classic' | 'modern'
 
-const LAYOUT_KEY = 'chirp.layout'
+const LAYOUT_KEY = 'bario.layout'
 
 function readLayout(): LayoutMode {
   return localStorage.getItem(LAYOUT_KEY) === 'classic' ? 'classic' : 'modern'

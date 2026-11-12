@@ -8,18 +8,18 @@ COPY pkg ./pkg
 COPY services ./services
 
 ENV CGO_ENABLED=0
-RUN go build -trimpath -ldflags="-s -w" -o /out/chirp-posts ./services/posts
+RUN go build -trimpath -ldflags="-s -w" -o /out/bario-posts ./services/posts
 
 FROM alpine:3.21
 
 RUN apk add --no-cache ca-certificates \
-    && addgroup -S -g 10001 chirp \
-    && adduser -S -u 10001 -G chirp chirp
+    && addgroup -S -g 10001 bario \
+    && adduser -S -u 10001 -G bario bario
 
-COPY --from=build /out/chirp-posts /usr/local/bin/chirp-posts
+COPY --from=build /out/bario-posts /usr/local/bin/bario-posts
 
 USER 10001:10001
 
 EXPOSE 8080 9090
 
-ENTRYPOINT ["/usr/local/bin/chirp-posts"]
+ENTRYPOINT ["/usr/local/bin/bario-posts"]

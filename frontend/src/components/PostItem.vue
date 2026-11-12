@@ -21,7 +21,7 @@ defineProps<{ post: Post }>()
     <div v-if="post.image_id" class="post-image">
       <img
         :src="`/api/uploads/${post.image_id}`"
-        :alt="`Image attached to the chirp by ${post.author.username}`"
+        :alt="`Image attached to the bario by ${post.author.username}`"
         loading="lazy"
       />
     </div>

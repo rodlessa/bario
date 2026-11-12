@@ -1,4 +1,4 @@
-// Package db opens the PostgreSQL pool shared by the Chirp services, creates
+// Package db opens the PostgreSQL pool shared by the Bario services, creates
 // the service's own schema and applies idempotent migrations.
 package db
 

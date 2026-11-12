@@ -1,45 +1,26 @@
-{{- $fullname := include "chirp.fullname" . -}}
-{{- $name := printf "%s-uploads" $fullname -}}
-{{- $svc := index .Values.services "uploads" -}}
+{{- $fullname := include "bario.fullname" . -}}
+{{- $name := printf "%s-follows" $fullname -}}
+{{- $svc := index .Values.services "follows" -}}
 {{- $postgresSecret := printf "%s-postgres" $fullname -}}
 {{- $jwtSecret := printf "%s-jwt" $fullname -}}
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: {{ $name }}-data
-  labels:
-    {{- include "chirp.labels" . | nindent 4 }}
-    app.kubernetes.io/component: uploads
-spec:
-  accessModes:
-    - ReadWriteOnce
-  {{- if .Values.uploads.storageClassName }}
-  storageClassName: {{ .Values.uploads.storageClassName | quote }}
-  {{- end }}
-  resources:
-    requests:
-      storage: {{ .Values.uploads.storage }}
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ $name }}
   labels:
-    {{- include "chirp.labels" . | nindent 4 }}
-    app.kubernetes.io/component: uploads
+    {{- include "bario.labels" . | nindent 4 }}
+    app.kubernetes.io/component: follows
 spec:
   replicas: {{ $svc.replicas }}
-  strategy:
-    type: Recreate
   selector:
     matchLabels:
-      {{- include "chirp.selectorLabels" . | nindent 6 }}
-      app.kubernetes.io/component: uploads
+      {{- include "bario.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: follows
   template:
     metadata:
       labels:
-        {{- include "chirp.selectorLabels" . | nindent 8 }}
-        app.kubernetes.io/component: uploads
+        {{- include "bario.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: follows
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
@@ -49,12 +30,10 @@ spec:
         runAsNonRoot: true
         runAsUser: 10001
         runAsGroup: 10001
-        fsGroup: 10001
-        fsGroupChangePolicy: OnRootMismatch
         seccompProfile:
           type: RuntimeDefault
       containers:
-        - name: uploads
+        - name: follows
           image: "{{ $svc.image.repository }}:{{ $svc.image.tag }}"
           imagePullPolicy: {{ $svc.image.pullPolicy }}
           securityContext:
@@ -73,25 +52,20 @@ spec:
               value: "8080"
             - name: METRICS_PORT
               value: "9090"
-            - name: UPLOAD_DIR
-              value: /data/uploads
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ $postgresSecret }}
                   key: password
             - name: DATABASE_URL
-              value: {{ include "chirp.databaseURL" . | quote }}
+              value: {{ include "bario.databaseURL" . | quote }}
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
                   name: {{ $jwtSecret }}
                   key: jwt-secret
-          volumeMounts:
-            - name: data
-              mountPath: /data/uploads
-            - name: tmp
-              mountPath: /tmp
+            - name: AUTH_URL
+              value: "http://{{ $fullname }}-auth:8080"
           readinessProbe:
             httpGet:
               path: /healthz
@@ -112,25 +86,19 @@ spec:
             failureThreshold: 30
           resources:
             {{- toYaml $svc.resources | nindent 12 }}
-      volumes:
-        - name: data
-          persistentVolumeClaim:
-            claimName: {{ $name }}-data
-        - name: tmp
-          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: {{ $name }}
   labels:
-    {{- include "chirp.labels" . | nindent 4 }}
-    app.kubernetes.io/component: uploads
+    {{- include "bario.labels" . | nindent 4 }}
+    app.kubernetes.io/component: follows
 spec:
   type: ClusterIP
   selector:
-    {{- include "chirp.selectorLabels" . | nindent 4 }}
-    app.kubernetes.io/component: uploads
+    {{- include "bario.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: follows
   ports:
     - name: http
       port: 8080
@@ -141,13 +109,13 @@ kind: Service
 metadata:
   name: {{ $name }}-metrics
   labels:
-    {{- include "chirp.labels" . | nindent 4 }}
-    app.kubernetes.io/component: uploads-metrics
+    {{- include "bario.labels" . | nindent 4 }}
+    app.kubernetes.io/component: follows-metrics
 spec:
   type: ClusterIP
   selector:
-    {{- include "chirp.selectorLabels" . | nindent 4 }}
-    app.kubernetes.io/component: uploads
+    {{- include "bario.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: follows
   ports:
     - name: metrics
       port: 9090

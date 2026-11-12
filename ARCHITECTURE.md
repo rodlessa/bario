@@ -1,4 +1,4 @@
-# Chirp — a small social network (Twitter-like)
+# Bario — a small social network (Twitter-like)
 
 A minimal Twitter clone: post short messages, attach images, follow/unfollow users,
 and get a home feed. Built for local Kubernetes, with per-service metrics that are
@@ -75,8 +75,8 @@ Every Go service:
 Each service exposes, on **:9090/metrics** only:
 
 ```
-chirp_http_requests_total{service, endpoint, method, status}
-chirp_http_request_duration_seconds{service, endpoint, method}   # histogram
+bario_http_requests_total{service, endpoint, method, status}
+bario_http_request_duration_seconds{service, endpoint, method}   # histogram
 ```
 
 Labels: `service` ∈ {auth, posts, uploads, follows}; `endpoint` is the canonical
@@ -100,10 +100,10 @@ No `NodePort`, no `LoadBalancer`, no Ingress path for metrics.
     component variants, not two codebases.
 - Pages: login/register, home feed, user profile, single post, compose (with image upload).
 
-## Deploy — Helm chart (`deploy/chirp/`)
+## Deploy — Helm chart (`deploy/bario/`)
 
 ```
-deploy/chirp/
+deploy/bario/
 ├── Chart.yaml
 ├── values.yaml
 └── templates/
@@ -124,7 +124,7 @@ targeting each `<service>-metrics:9090` service.
 ## Directory layout
 
 ```
-~/chirp/
+~/bario/
 ├── ARCHITECTURE.md
 ├── README.md
 ├── Makefile                   # build / docker-build / helm-install / helm-upgrade
@@ -137,7 +137,7 @@ targeting each `<service>-metrics:9090` service.
 │       ├── uploads/
 │       └── follows/
 ├── frontend/                  # Vue 3 + TS + Vite
-└── deploy/chirp/              # Helm chart
+└── deploy/bario/              # Helm chart
 ```
 
 ## Security

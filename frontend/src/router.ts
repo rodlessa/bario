@@ -66,7 +66,7 @@ router.beforeEach((to) => {
 })
 
 router.afterEach((to) => {
-  document.title = to.meta.title ? `${to.meta.title} · Chirp` : 'Chirp'
+  document.title = to.meta.title ? `${to.meta.title} · Bario` : 'Bario'
 })
 
 export default router

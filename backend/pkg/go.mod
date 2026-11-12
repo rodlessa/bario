@@ -1,4 +1,4 @@
-module chirp/pkg
+module bario/pkg
 
 go 1.24.0
 

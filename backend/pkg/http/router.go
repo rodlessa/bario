@@ -1,12 +1,12 @@
-// Package chirphttp holds the HTTP plumbing shared by all Chirp services:
+// Package bariohttp holds the HTTP plumbing shared by all Bario services:
 // routing with canonical metric labels, JSON helpers, auth middleware and
 // server lifecycle.
-package chirphttp
+package bariohttp
 
 import (
 	"net/http"
 
-	"chirp/pkg/metrics"
+	"bario/pkg/metrics"
 )
 
 // Router registers routes together with the canonical endpoint label used for

@@ -23,7 +23,7 @@ async function loadPost(): Promise<void> {
   try {
     post.value = await api.getPost(postId.value)
   } catch (err) {
-    error.value = errorMessage(err, 'Could not load this chirp')
+    error.value = errorMessage(err, 'Could not load this bario')
   } finally {
     loading.value = false
   }
@@ -41,12 +41,12 @@ watch(postId, () => {
 <template>
   <section class="page-head">
     <div>
-      <h1>Chirp</h1>
+      <h1>Bario</h1>
       <RouterLink class="text-link" to="/">← Back to the feed</RouterLink>
     </div>
   </section>
 
-  <p v-if="loading" class="panel muted">Loading chirp…</p>
+  <p v-if="loading" class="panel muted">Loading bario…</p>
   <p v-else-if="error" class="panel error" role="alert">{{ error }}</p>
 
   <template v-else-if="post">

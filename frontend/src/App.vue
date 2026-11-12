@@ -17,7 +17,7 @@ function handleLogout(): void {
   <div class="app" :class="`layout-${layout}`">
     <header class="topbar">
       <div class="topbar-inner">
-        <RouterLink class="brand" to="/">chirp<span class="brand-mark">.</span></RouterLink>
+        <RouterLink class="brand" to="/">bario<span class="brand-mark">.</span></RouterLink>
 
         <nav class="topnav">
           <RouterLink to="/">Feed</RouterLink>
@@ -62,10 +62,10 @@ function handleLogout(): void {
           <template v-if="state.user">
             <RouterLink class="account-name" :to="`/u/${state.user.id}`">@{{ state.user.username }}</RouterLink>
             <p class="muted">Signed in</p>
-            <RouterLink class="button primary block" to="/compose">New chirp</RouterLink>
+            <RouterLink class="button primary block" to="/compose">New bario</RouterLink>
           </template>
           <template v-else>
-            <p class="sidebar-title">Welcome to Chirp</p>
+            <p class="sidebar-title">Welcome to Bario</p>
             <p class="muted">Short messages, images, and the people you follow.</p>
             <RouterLink class="button primary block" to="/register">Create account</RouterLink>
             <RouterLink class="button ghost block" to="/login">Log in</RouterLink>

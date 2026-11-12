@@ -38,7 +38,7 @@ export interface UploadResponse {
   url: string
 }
 
-const TOKEN_KEY = 'chirp.token'
+const TOKEN_KEY = 'bario.token'
 
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY)
@@ -76,7 +76,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   try {
     response = await fetch(path, { ...init, headers })
   } catch {
-    throw new ApiError('Could not reach the Chirp server', 0)
+    throw new ApiError('Could not reach the Bario server', 0)
   }
 
   if (!response.ok) {

@@ -1,8 +1,8 @@
-{{- define "chirp.name" -}}
+{{- define "bario.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
-{{- define "chirp.fullname" -}}
+{{- define "bario.fullname" -}}
 {{- if .Values.fullnameOverride -}}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" -}}
 {{- else -}}
@@ -15,23 +15,23 @@
 {{- end -}}
 {{- end -}}
 
-{{- define "chirp.labels" -}}
+{{- define "bario.labels" -}}
 helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" }}
-app.kubernetes.io/name: {{ include "chirp.name" . }}
+app.kubernetes.io/name: {{ include "bario.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end -}}
 
-{{- define "chirp.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "chirp.name" . }}
+{{- define "bario.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "bario.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
 
-{{- define "chirp.serviceName" -}}
-{{- printf "%s-%s" (include "chirp.fullname" .root) .component | trunc 63 | trimSuffix "-" -}}
+{{- define "bario.serviceName" -}}
+{{- printf "%s-%s" (include "bario.fullname" .root) .component | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
-{{- define "chirp.databaseURL" -}}
-postgres://{{ .Values.postgres.user }}:$(POSTGRES_PASSWORD)@{{ include "chirp.fullname" . }}-postgres:5432/{{ .Values.postgres.database }}?sslmode=disable
+{{- define "bario.databaseURL" -}}
+postgres://{{ .Values.postgres.user }}:$(POSTGRES_PASSWORD)@{{ include "bario.fullname" . }}-postgres:5432/{{ .Values.postgres.database }}?sslmode=disable
 {{- end -}}

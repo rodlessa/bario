@@ -25,7 +25,7 @@ type Client struct {
 	http    *http.Client
 }
 
-// New creates a client for baseURL, e.g. http://chirp-auth:8080.
+// New creates a client for baseURL, e.g. http://bario-auth:8080.
 func New(baseURL string) *Client {
 	return &Client{
 		baseURL: strings.TrimRight(baseURL, "/"),

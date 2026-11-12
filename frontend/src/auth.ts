@@ -1,7 +1,7 @@
 import { computed, reactive } from 'vue'
 import { api, getToken, setToken, type User } from './api'
 
-const USER_KEY = 'chirp.user'
+const USER_KEY = 'bario.user'
 
 interface AuthState {
   token: string | null

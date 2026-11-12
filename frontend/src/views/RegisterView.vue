@@ -41,7 +41,7 @@ async function submit(): Promise<void> {
     <header class="page-head">
       <div>
         <h1>Create account</h1>
-        <p class="muted">Three fields and you are chirping.</p>
+        <p class="muted">Three fields and you are barioing.</p>
       </div>
     </header>
 

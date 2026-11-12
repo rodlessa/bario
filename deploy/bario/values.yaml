@@ -8,7 +8,7 @@ services:
   auth:
     replicas: 1
     image:
-      repository: chirp/auth
+      repository: bario/auth
       tag: latest
       pullPolicy: IfNotPresent
     resources:
@@ -21,7 +21,7 @@ services:
   posts:
     replicas: 1
     image:
-      repository: chirp/posts
+      repository: bario/posts
       tag: latest
       pullPolicy: IfNotPresent
     resources:
@@ -34,7 +34,7 @@ services:
   uploads:
     replicas: 1
     image:
-      repository: chirp/uploads
+      repository: bario/uploads
       tag: latest
       pullPolicy: IfNotPresent
     resources:
@@ -47,7 +47,7 @@ services:
   follows:
     replicas: 1
     image:
-      repository: chirp/follows
+      repository: bario/follows
       tag: latest
       pullPolicy: IfNotPresent
     resources:
@@ -61,7 +61,7 @@ services:
 frontend:
   replicas: 1
   image:
-    repository: chirp/frontend
+    repository: bario/frontend
     tag: latest
     pullPolicy: IfNotPresent
   resources:
@@ -76,8 +76,8 @@ postgres:
   image:
     repository: postgres
     tag: "16-alpine"
-  user: chirp
-  database: chirp
+  user: bario
+  database: bario
   # Leave empty to let the chart generate a random password on first install.
   # The generated value is stored in the Kubernetes Secret and reused on upgrade.
   password: ""
@@ -104,7 +104,7 @@ ingress:
   enabled: true
   className: nginx
   annotations: {}
-  host: chirp.local
+  host: bario.local
 
 prometheus:
   image:

@@ -1,6 +1,6 @@
-// Package metrics exposes the Prometheus instrumentation shared by every Chirp
+// Package metrics exposes the Prometheus instrumentation shared by every Bario
 // service. Each service gets its own registry so that only its own metrics are
-// served, and registers the two canonical Chirp metrics.
+// served, and registers the two canonical Bario metrics.
 package metrics
 
 import (
@@ -25,12 +25,12 @@ func New(service string) *Metrics {
 	registry := prometheus.NewRegistry()
 
 	requests := prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name: "chirp_http_requests_total",
-		Help: "Total number of HTTP requests handled by a Chirp service.",
+		Name: "bario_http_requests_total",
+		Help: "Total number of HTTP requests handled by a Bario service.",
 	}, []string{"service", "endpoint", "method", "status"})
 
 	duration := prometheus.NewHistogramVec(prometheus.HistogramOpts{
-		Name:    "chirp_http_request_duration_seconds",
+		Name:    "bario_http_request_duration_seconds",
 		Help:    "HTTP request latency in seconds.",
 		Buckets: []float64{0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5},
 	}, []string{"service", "endpoint", "method"})

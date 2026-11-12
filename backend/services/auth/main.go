@@ -1,4 +1,4 @@
-// Command auth is the Chirp identity service. It registers users, issues JWTs
+// Command auth is the Bario identity service. It registers users, issues JWTs
 // and exposes public profiles.
 package main
 
@@ -16,10 +16,10 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
-	"chirp/pkg/db"
-	chirphttp "chirp/pkg/http"
-	"chirp/pkg/jwt"
-	"chirp/pkg/metrics"
+	"bario/pkg/db"
+	bariohttp "bario/pkg/http"
+	"bario/pkg/jwt"
+	"bario/pkg/metrics"
 )
 
 const schema = "auth"
@@ -40,7 +40,7 @@ func main() {
 }
 
 func run() error {
-	ctx, stop := chirphttp.SignalContext()
+	ctx, stop := bariohttp.SignalContext()
 	defer stop()
 
 	pool, err := db.Connect(ctx, os.Getenv("DATABASE_URL"), schema)
@@ -68,15 +68,15 @@ func run() error {
 
 	srv := &server{db: pool, tokens: tokens}
 	m := metrics.New("auth")
-	router := chirphttp.NewRouter(m)
+	router := bariohttp.NewRouter(m)
 	srv.registerRoutes(router)
 
-	return chirphttp.Serve(ctx, ":"+env("HTTP_PORT", "8080"), router.Handler(), ":"+env("METRICS_PORT", "9090"), m.Handler())
+	return bariohttp.Serve(ctx, ":"+env("HTTP_PORT", "8080"), router.Handler(), ":"+env("METRICS_PORT", "9090"), m.Handler())
 }
 
-func (s *server) registerRoutes(router *chirphttp.Router) {
+func (s *server) registerRoutes(router *bariohttp.Router) {
 	for _, prefix := range []string{"", "/api/auth"} {
-		router.Get(prefix+"/healthz", "health", chirphttp.Healthy)
+		router.Get(prefix+"/healthz", "health", bariohttp.Healthy)
 		router.Post(prefix+"/register", "register", s.handleRegister)
 		router.Post(prefix+"/login", "login", s.handleLogin)
 		router.Get(prefix+"/users/{id}", "get_user", s.handleGetUser)
@@ -91,7 +91,7 @@ type registerRequest struct {
 
 func (s *server) handleRegister(w http.ResponseWriter, r *http.Request) {
 	var req registerRequest
-	if !chirphttp.DecodeJSON(w, r, &req) {
+	if !bariohttp.DecodeJSON(w, r, &req) {
 		return
 	}
 
@@ -99,22 +99,22 @@ func (s *server) handleRegister(w http.ResponseWriter, r *http.Request) {
 	email := strings.ToLower(strings.TrimSpace(req.Email))
 
 	if !usernamePattern.MatchString(username) {
-		chirphttp.WriteError(w, http.StatusBadRequest, "username must be 3-32 characters and contain only letters, digits or underscores")
+		bariohttp.WriteError(w, http.StatusBadRequest, "username must be 3-32 characters and contain only letters, digits or underscores")
 		return
 	}
 	if len(req.Password) < 8 || len(req.Password) > 72 {
-		chirphttp.WriteError(w, http.StatusBadRequest, "password must be between 8 and 72 characters")
+		bariohttp.WriteError(w, http.StatusBadRequest, "password must be between 8 and 72 characters")
 		return
 	}
 	if addr, err := netmail.ParseAddress(email); err != nil || addr.Address != email || len(email) > 254 {
-		chirphttp.WriteError(w, http.StatusBadRequest, "a valid email address is required")
+		bariohttp.WriteError(w, http.StatusBadRequest, "a valid email address is required")
 		return
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		slog.Error("hash password", "error", err)
-		chirphttp.WriteError(w, http.StatusInternalServerError, "could not create account")
+		bariohttp.WriteError(w, http.StatusInternalServerError, "could not create account")
 		return
 	}
 
@@ -125,15 +125,15 @@ func (s *server) handleRegister(w http.ResponseWriter, r *http.Request) {
 	).Scan(&id)
 	if err != nil {
 		if db.IsUniqueViolation(err) {
-			chirphttp.WriteError(w, http.StatusConflict, "username is already taken")
+			bariohttp.WriteError(w, http.StatusConflict, "username is already taken")
 			return
 		}
 		slog.Error("insert user", "error", err)
-		chirphttp.WriteError(w, http.StatusInternalServerError, "could not create account")
+		bariohttp.WriteError(w, http.StatusInternalServerError, "could not create account")
 		return
 	}
 
-	chirphttp.WriteJSON(w, http.StatusCreated, map[string]any{"id": id, "username": username})
+	bariohttp.WriteJSON(w, http.StatusCreated, map[string]any{"id": id, "username": username})
 }
 
 type loginRequest struct {
@@ -143,7 +143,7 @@ type loginRequest struct {
 
 func (s *server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	var req loginRequest
-	if !chirphttp.DecodeJSON(w, r, &req) {
+	if !bariohttp.DecodeJSON(w, r, &req) {
 		return
 	}
 
@@ -157,28 +157,28 @@ func (s *server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		`SELECT id, username, password_hash FROM auth.users WHERE username = $1`, username,
 	).Scan(&id, &storedAs, &hash)
 	if errors.Is(err, sql.ErrNoRows) {
-		chirphttp.WriteError(w, http.StatusUnauthorized, "invalid username or password")
+		bariohttp.WriteError(w, http.StatusUnauthorized, "invalid username or password")
 		return
 	}
 	if err != nil {
 		slog.Error("lookup user", "error", err)
-		chirphttp.WriteError(w, http.StatusInternalServerError, "could not sign in")
+		bariohttp.WriteError(w, http.StatusInternalServerError, "could not sign in")
 		return
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(req.Password)); err != nil {
-		chirphttp.WriteError(w, http.StatusUnauthorized, "invalid username or password")
+		bariohttp.WriteError(w, http.StatusUnauthorized, "invalid username or password")
 		return
 	}
 
 	token, err := s.tokens.Issue(id, storedAs)
 	if err != nil {
 		slog.Error("issue token", "error", err)
-		chirphttp.WriteError(w, http.StatusInternalServerError, "could not sign in")
+		bariohttp.WriteError(w, http.StatusInternalServerError, "could not sign in")
 		return
 	}
 
-	chirphttp.WriteJSON(w, http.StatusOK, map[string]any{
+	bariohttp.WriteJSON(w, http.StatusOK, map[string]any{
 		"token": token,
 		"user":  map[string]any{"id": id, "username": storedAs},
 	})
@@ -198,16 +198,16 @@ func (s *server) handleGetUser(w http.ResponseWriter, r *http.Request) {
 		`SELECT username, created_at FROM auth.users WHERE id = $1`, id,
 	).Scan(&username, &createdAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		chirphttp.WriteError(w, http.StatusNotFound, "user not found")
+		bariohttp.WriteError(w, http.StatusNotFound, "user not found")
 		return
 	}
 	if err != nil {
 		slog.Error("get user", "error", err)
-		chirphttp.WriteError(w, http.StatusInternalServerError, "could not load user")
+		bariohttp.WriteError(w, http.StatusInternalServerError, "could not load user")
 		return
 	}
 
-	chirphttp.WriteJSON(w, http.StatusOK, map[string]any{
+	bariohttp.WriteJSON(w, http.StatusOK, map[string]any{
 		"id":         id,
 		"username":   username,
 		"created_at": createdAt,
@@ -217,7 +217,7 @@ func (s *server) handleGetUser(w http.ResponseWriter, r *http.Request) {
 func parseID(w http.ResponseWriter, raw string) (int64, bool) {
 	id, err := strconv.ParseInt(raw, 10, 64)
 	if err != nil || id <= 0 {
-		chirphttp.WriteError(w, http.StatusBadRequest, "invalid id")
+		bariohttp.WriteError(w, http.StatusBadRequest, "invalid id")
 		return 0, false
 	}
 	return id, true

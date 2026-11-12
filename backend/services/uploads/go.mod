@@ -1,8 +1,8 @@
-module chirp/service/uploads
+module bario/service/uploads
 
 go 1.24.0
 
-require chirp/pkg v0.0.0
+require bario/pkg v0.0.0
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -19,4 +19,4 @@ require (
 	google.golang.org/protobuf v1.34.2 // indirect
 )
 
-replace chirp/pkg => ../../pkg
+replace bario/pkg => ../../pkg

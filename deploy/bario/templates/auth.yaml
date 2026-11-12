@@ -1,4 +1,4 @@
-{{- $fullname := include "chirp.fullname" . -}}
+{{- $fullname := include "bario.fullname" . -}}
 {{- $name := printf "%s-auth" $fullname -}}
 {{- $svc := index .Values.services "auth" -}}
 {{- $postgresSecret := printf "%s-postgres" $fullname -}}
@@ -8,18 +8,18 @@ kind: Deployment
 metadata:
   name: {{ $name }}
   labels:
-    {{- include "chirp.labels" . | nindent 4 }}
+    {{- include "bario.labels" . | nindent 4 }}
     app.kubernetes.io/component: auth
 spec:
   replicas: {{ $svc.replicas }}
   selector:
     matchLabels:
-      {{- include "chirp.selectorLabels" . | nindent 6 }}
+      {{- include "bario.selectorLabels" . | nindent 6 }}
       app.kubernetes.io/component: auth
   template:
     metadata:
       labels:
-        {{- include "chirp.selectorLabels" . | nindent 8 }}
+        {{- include "bario.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: auth
     spec:
       {{- with .Values.imagePullSecrets }}
@@ -58,7 +58,7 @@ spec:
                   name: {{ $postgresSecret }}
                   key: password
             - name: DATABASE_URL
-              value: {{ include "chirp.databaseURL" . | quote }}
+              value: {{ include "bario.databaseURL" . | quote }}
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
@@ -90,12 +90,12 @@ kind: Service
 metadata:
   name: {{ $name }}
   labels:
-    {{- include "chirp.labels" . | nindent 4 }}
+    {{- include "bario.labels" . | nindent 4 }}
     app.kubernetes.io/component: auth
 spec:
   type: ClusterIP
   selector:
-    {{- include "chirp.selectorLabels" . | nindent 4 }}
+    {{- include "bario.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/component: auth
   ports:
     - name: http
@@ -107,12 +107,12 @@ kind: Service
 metadata:
   name: {{ $name }}-metrics
   labels:
-    {{- include "chirp.labels" . | nindent 4 }}
+    {{- include "bario.labels" . | nindent 4 }}
     app.kubernetes.io/component: auth-metrics
 spec:
   type: ClusterIP
   selector:
-    {{- include "chirp.selectorLabels" . | nindent 4 }}
+    {{- include "bario.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/component: auth
   ports:
     - name: metrics

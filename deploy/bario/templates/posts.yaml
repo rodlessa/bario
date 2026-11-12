@@ -1,4 +1,4 @@
-{{- $fullname := include "chirp.fullname" . -}}
+{{- $fullname := include "bario.fullname" . -}}
 {{- $name := printf "%s-posts" $fullname -}}
 {{- $svc := index .Values.services "posts" -}}
 {{- $postgresSecret := printf "%s-postgres" $fullname -}}
@@ -8,18 +8,18 @@ kind: Deployment
 metadata:
   name: {{ $name }}
   labels:
-    {{- include "chirp.labels" . | nindent 4 }}
+    {{- include "bario.labels" . | nindent 4 }}
     app.kubernetes.io/component: posts
 spec:
   replicas: {{ $svc.replicas }}
   selector:
     matchLabels:
-      {{- include "chirp.selectorLabels" . | nindent 6 }}
+      {{- include "bario.selectorLabels" . | nindent 6 }}
       app.kubernetes.io/component: posts
   template:
     metadata:
       labels:
-        {{- include "chirp.selectorLabels" . | nindent 8 }}
+        {{- include "bario.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: posts
     spec:
       {{- with .Values.imagePullSecrets }}
@@ -58,7 +58,7 @@ spec:
                   name: {{ $postgresSecret }}
                   key: password
             - name: DATABASE_URL
-              value: {{ include "chirp.databaseURL" . | quote }}
+              value: {{ include "bario.databaseURL" . | quote }}
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
@@ -94,12 +94,12 @@ kind: Service
 metadata:
   name: {{ $name }}
   labels:
-    {{- include "chirp.labels" . | nindent 4 }}
+    {{- include "bario.labels" . | nindent 4 }}
     app.kubernetes.io/component: posts
 spec:
   type: ClusterIP
   selector:
-    {{- include "chirp.selectorLabels" . | nindent 4 }}
+    {{- include "bario.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/component: posts
   ports:
     - name: http
@@ -111,12 +111,12 @@ kind: Service
 metadata:
   name: {{ $name }}-metrics
   labels:
-    {{- include "chirp.labels" . | nindent 4 }}
+    {{- include "bario.labels" . | nindent 4 }}
     app.kubernetes.io/component: posts-metrics
 spec:
   type: ClusterIP
   selector:
-    {{- include "chirp.selectorLabels" . | nindent 4 }}
+    {{- include "bario.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/component: posts
   ports:
     - name: metrics

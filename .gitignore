@@ -1,6 +1,11 @@
 # Go
 backend/bin/
 backend/vendor/
+# go build writes one binary per service into its package dir (see Makefile)
+backend/services/*/auth
+backend/services/*/posts
+backend/services/*/uploads
+backend/services/*/follows
 
 # Node / Vue
 frontend/node_modules/

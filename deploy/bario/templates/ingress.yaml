@@ -1,11 +1,11 @@
 {{- if .Values.ingress.enabled }}
-{{- $fullname := include "chirp.fullname" . -}}
+{{- $fullname := include "bario.fullname" . -}}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: {{ $fullname }}
   labels:
-    {{- include "chirp.labels" . | nindent 4 }}
+    {{- include "bario.labels" . | nindent 4 }}
   {{- with .Values.ingress.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
@@ -22,35 +22,35 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: {{ include "chirp.serviceName" (dict "root" . "component" "auth") }}
+                name: {{ include "bario.serviceName" (dict "root" . "component" "auth") }}
                 port:
                   number: 8080
           - path: /api/posts
             pathType: Prefix
             backend:
               service:
-                name: {{ include "chirp.serviceName" (dict "root" . "component" "posts") }}
+                name: {{ include "bario.serviceName" (dict "root" . "component" "posts") }}
                 port:
                   number: 8080
           - path: /api/uploads
             pathType: Prefix
             backend:
               service:
-                name: {{ include "chirp.serviceName" (dict "root" . "component" "uploads") }}
+                name: {{ include "bario.serviceName" (dict "root" . "component" "uploads") }}
                 port:
                   number: 8080
           - path: /api/follows
             pathType: Prefix
             backend:
               service:
-                name: {{ include "chirp.serviceName" (dict "root" . "component" "follows") }}
+                name: {{ include "bario.serviceName" (dict "root" . "component" "follows") }}
                 port:
                   number: 8080
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: {{ include "chirp.serviceName" (dict "root" . "component" "frontend") }}
+                name: {{ include "bario.serviceName" (dict "root" . "component" "frontend") }}
                 port:
                   number: 80
 {{- end }}

@@ -1,4 +1,4 @@
-{{- $fullname := include "chirp.fullname" . -}}
+{{- $fullname := include "bario.fullname" . -}}
 {{- $postgresSecret := printf "%s-postgres" $fullname -}}
 {{- $jwtSecret := printf "%s-jwt" $fullname -}}
 {{- $existingPostgres := lookup "v1" "Secret" .Release.Namespace $postgresSecret -}}
@@ -24,7 +24,7 @@ kind: Secret
 metadata:
   name: {{ $postgresSecret }}
   labels:
-    {{- include "chirp.labels" . | nindent 4 }}
+    {{- include "bario.labels" . | nindent 4 }}
     app.kubernetes.io/component: postgres
 type: Opaque
 data:
@@ -35,7 +35,7 @@ kind: Secret
 metadata:
   name: {{ $jwtSecret }}
   labels:
-    {{- include "chirp.labels" . | nindent 4 }}
+    {{- include "bario.labels" . | nindent 4 }}
     app.kubernetes.io/component: auth
 type: Opaque
 data:
@@ -46,12 +46,12 @@ kind: Service
 metadata:
   name: {{ $fullname }}-postgres
   labels:
-    {{- include "chirp.labels" . | nindent 4 }}
+    {{- include "bario.labels" . | nindent 4 }}
     app.kubernetes.io/component: postgres
 spec:
   clusterIP: None
   selector:
-    {{- include "chirp.selectorLabels" . | nindent 4 }}
+    {{- include "bario.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/component: postgres
   ports:
     - name: postgres
@@ -63,7 +63,7 @@ kind: PersistentVolumeClaim
 metadata:
   name: {{ $fullname }}-postgres-data
   labels:
-    {{- include "chirp.labels" . | nindent 4 }}
+    {{- include "bario.labels" . | nindent 4 }}
     app.kubernetes.io/component: postgres
 spec:
   accessModes:
@@ -80,19 +80,19 @@ kind: StatefulSet
 metadata:
   name: {{ $fullname }}-postgres
   labels:
-    {{- include "chirp.labels" . | nindent 4 }}
+    {{- include "bario.labels" . | nindent 4 }}
     app.kubernetes.io/component: postgres
 spec:
   serviceName: {{ $fullname }}-postgres
   replicas: 1
   selector:
     matchLabels:
-      {{- include "chirp.selectorLabels" . | nindent 6 }}
+      {{- include "bario.selectorLabels" . | nindent 6 }}
       app.kubernetes.io/component: postgres
   template:
     metadata:
       labels:
-        {{- include "chirp.selectorLabels" . | nindent 8 }}
+        {{- include "bario.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: postgres
     spec:
       containers:

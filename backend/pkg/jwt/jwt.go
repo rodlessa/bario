@@ -1,4 +1,4 @@
-// Package jwt issues and verifies the HS256 tokens shared by the Chirp
+// Package jwt issues and verifies the HS256 tokens shared by the Bario
 // services. The signing secret comes from the JWT_SECRET environment variable.
 package jwt
 
@@ -13,7 +13,7 @@ import (
 )
 
 // Issuer is stamped into every token issued by the auth service.
-const Issuer = "chirp-auth"
+const Issuer = "bario-auth"
 
 var (
 	ErrMissingToken = errors.New("missing bearer token")

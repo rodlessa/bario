@@ -16,10 +16,10 @@ import (
 	"strings"
 	"time"
 
-	"chirp/pkg/db"
-	chirphttp "chirp/pkg/http"
-	"chirp/pkg/jwt"
-	"chirp/pkg/metrics"
+	"bario/pkg/db"
+	bariohttp "bario/pkg/http"
+	"bario/pkg/jwt"
+	"bario/pkg/metrics"
 )
 
 const (
@@ -44,7 +44,7 @@ func main() {
 }
 
 func run() error {
-	ctx, stop := chirphttp.SignalContext()
+	ctx, stop := bariohttp.SignalContext()
 	defer stop()
 
 	pool, err := db.Connect(ctx, os.Getenv("DATABASE_URL"), schema)
@@ -79,17 +79,17 @@ func run() error {
 
 	srv := &server{db: pool, tokens: tokens, uploadDir: uploadDir}
 	m := metrics.New("uploads")
-	router := chirphttp.NewRouter(m)
+	router := bariohttp.NewRouter(m)
 	srv.registerRoutes(router)
 
-	return chirphttp.Serve(ctx, ":"+env("HTTP_PORT", "8080"), router.Handler(), ":"+env("METRICS_PORT", "9090"), m.Handler())
+	return bariohttp.Serve(ctx, ":"+env("HTTP_PORT", "8080"), router.Handler(), ":"+env("METRICS_PORT", "9090"), m.Handler())
 }
 
-func (s *server) registerRoutes(router *chirphttp.Router) {
-	router.Get("/healthz", "health", chirphttp.Healthy)
-	router.Get("/api/uploads/healthz", "health", chirphttp.Healthy)
+func (s *server) registerRoutes(router *bariohttp.Router) {
+	router.Get("/healthz", "health", bariohttp.Healthy)
+	router.Get("/api/uploads/healthz", "health", bariohttp.Healthy)
 
-	upload := chirphttp.RequireAuth(s.tokens, s.handleUpload)
+	upload := bariohttp.RequireAuth(s.tokens, s.handleUpload)
 	router.Post("/uploads", "upload_image", upload)
 	router.Post("/api/uploads", "upload_image", upload)
 	router.Post("/api/uploads/uploads", "upload_image", upload)
@@ -104,52 +104,52 @@ func (s *server) handleUpload(w http.ResponseWriter, r *http.Request, claims *jw
 	if err := r.ParseMultipartForm(maxUploadSize); err != nil {
 		var tooLarge *http.MaxBytesError
 		if errors.As(err, &tooLarge) {
-			chirphttp.WriteError(w, http.StatusRequestEntityTooLarge, "image must be at most 10 MiB")
+			bariohttp.WriteError(w, http.StatusRequestEntityTooLarge, "image must be at most 10 MiB")
 			return
 		}
-		chirphttp.WriteError(w, http.StatusBadRequest, "invalid multipart form")
+		bariohttp.WriteError(w, http.StatusBadRequest, "invalid multipart form")
 		return
 	}
 	defer r.MultipartForm.RemoveAll()
 
 	file, header, err := r.FormFile("file")
 	if err != nil {
-		chirphttp.WriteError(w, http.StatusBadRequest, `multipart field "file" is required`)
+		bariohttp.WriteError(w, http.StatusBadRequest, `multipart field "file" is required`)
 		return
 	}
 	defer file.Close()
 
 	data, err := io.ReadAll(io.LimitReader(file, maxUploadSize+1))
 	if err != nil {
-		chirphttp.WriteError(w, http.StatusBadRequest, "could not read uploaded file")
+		bariohttp.WriteError(w, http.StatusBadRequest, "could not read uploaded file")
 		return
 	}
 	if len(data) == 0 {
-		chirphttp.WriteError(w, http.StatusBadRequest, "uploaded file is empty")
+		bariohttp.WriteError(w, http.StatusBadRequest, "uploaded file is empty")
 		return
 	}
 	if len(data) > maxUploadSize {
-		chirphttp.WriteError(w, http.StatusRequestEntityTooLarge, "image must be at most 10 MiB")
+		bariohttp.WriteError(w, http.StatusRequestEntityTooLarge, "image must be at most 10 MiB")
 		return
 	}
 
 	contentType := detectImageType(data)
 	if !strings.HasPrefix(contentType, "image/") {
-		chirphttp.WriteError(w, http.StatusUnsupportedMediaType, "uploaded file is not a supported image")
+		bariohttp.WriteError(w, http.StatusUnsupportedMediaType, "uploaded file is not a supported image")
 		return
 	}
 
 	id, err := newID()
 	if err != nil {
 		slog.Error("generate image id", "error", err)
-		chirphttp.WriteError(w, http.StatusInternalServerError, "could not store image")
+		bariohttp.WriteError(w, http.StatusInternalServerError, "could not store image")
 		return
 	}
 
 	path := filepath.Join(s.uploadDir, id)
 	if err := os.WriteFile(path, data, 0o644); err != nil {
 		slog.Error("write image", "error", err)
-		chirphttp.WriteError(w, http.StatusInternalServerError, "could not store image")
+		bariohttp.WriteError(w, http.StatusInternalServerError, "could not store image")
 		return
 	}
 
@@ -169,11 +169,11 @@ func (s *server) handleUpload(w http.ResponseWriter, r *http.Request, claims *jw
 		if removeErr := os.Remove(path); removeErr != nil {
 			slog.Error("remove orphaned image", "error", removeErr, "path", path)
 		}
-		chirphttp.WriteError(w, http.StatusInternalServerError, "could not store image")
+		bariohttp.WriteError(w, http.StatusInternalServerError, "could not store image")
 		return
 	}
 
-	chirphttp.WriteJSON(w, http.StatusCreated, map[string]string{
+	bariohttp.WriteJSON(w, http.StatusCreated, map[string]string{
 		"id":  id,
 		"url": "/api/uploads/" + id,
 	})
@@ -182,7 +182,7 @@ func (s *server) handleUpload(w http.ResponseWriter, r *http.Request, claims *jw
 func (s *server) handleGetImage(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if !idPattern.MatchString(id) {
-		chirphttp.WriteError(w, http.StatusBadRequest, "invalid image id")
+		bariohttp.WriteError(w, http.StatusBadRequest, "invalid image id")
 		return
 	}
 
@@ -194,12 +194,12 @@ func (s *server) handleGetImage(w http.ResponseWriter, r *http.Request) {
 		`SELECT filename, content_type FROM uploads.images WHERE id = $1`, id,
 	).Scan(&filename, &contentType)
 	if errors.Is(err, sql.ErrNoRows) {
-		chirphttp.WriteError(w, http.StatusNotFound, "image not found")
+		bariohttp.WriteError(w, http.StatusNotFound, "image not found")
 		return
 	}
 	if err != nil {
 		slog.Error("lookup image", "error", err)
-		chirphttp.WriteError(w, http.StatusInternalServerError, "could not load image")
+		bariohttp.WriteError(w, http.StatusInternalServerError, "could not load image")
 		return
 	}
 
@@ -208,11 +208,11 @@ func (s *server) handleGetImage(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			slog.Error("image file missing", "id", id)
-			chirphttp.WriteError(w, http.StatusNotFound, "image not found")
+			bariohttp.WriteError(w, http.StatusNotFound, "image not found")
 			return
 		}
 		slog.Error("open image", "error", err, "id", id)
-		chirphttp.WriteError(w, http.StatusInternalServerError, "could not load image")
+		bariohttp.WriteError(w, http.StatusInternalServerError, "could not load image")
 		return
 	}
 	defer file.Close()
@@ -220,7 +220,7 @@ func (s *server) handleGetImage(w http.ResponseWriter, r *http.Request) {
 	info, err := file.Stat()
 	if err != nil {
 		slog.Error("stat image", "error", err, "id", id)
-		chirphttp.WriteError(w, http.StatusInternalServerError, "could not load image")
+		bariohttp.WriteError(w, http.StatusInternalServerError, "could not load image")
 		return
 	}
 

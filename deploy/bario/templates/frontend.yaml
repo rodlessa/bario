@@ -1,22 +1,22 @@
-{{- $fullname := include "chirp.fullname" . -}}
+{{- $fullname := include "bario.fullname" . -}}
 {{- $name := printf "%s-frontend" $fullname -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ $name }}
   labels:
-    {{- include "chirp.labels" . | nindent 4 }}
+    {{- include "bario.labels" . | nindent 4 }}
     app.kubernetes.io/component: frontend
 spec:
   replicas: {{ .Values.frontend.replicas }}
   selector:
     matchLabels:
-      {{- include "chirp.selectorLabels" . | nindent 6 }}
+      {{- include "bario.selectorLabels" . | nindent 6 }}
       app.kubernetes.io/component: frontend
   template:
     metadata:
       labels:
-        {{- include "chirp.selectorLabels" . | nindent 8 }}
+        {{- include "bario.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: frontend
     spec:
       {{- with .Values.imagePullSecrets }}
@@ -61,12 +61,12 @@ kind: Service
 metadata:
   name: {{ $name }}
   labels:
-    {{- include "chirp.labels" . | nindent 4 }}
+    {{- include "bario.labels" . | nindent 4 }}
     app.kubernetes.io/component: frontend
 spec:
   type: ClusterIP
   selector:
-    {{- include "chirp.selectorLabels" . | nindent 4 }}
+    {{- include "bario.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/component: frontend
   ports:
     - name: http

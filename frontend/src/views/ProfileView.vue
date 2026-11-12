@@ -64,7 +64,7 @@ async function loadMore(): Promise<void> {
     posts.value = [...posts.value, ...page.posts]
     cursor.value = page.next_cursor
   } catch (err) {
-    actionError.value = errorMessage(err, 'Could not load more chirps')
+    actionError.value = errorMessage(err, 'Could not load more barios')
   } finally {
     loadingMore.value = false
   }
@@ -121,7 +121,7 @@ watch(userId, () => {
         </p>
       </div>
       <div class="profile-actions">
-        <RouterLink v-if="isSelf" class="button primary" to="/compose">New chirp</RouterLink>
+        <RouterLink v-if="isSelf" class="button primary" to="/compose">New bario</RouterLink>
         <RouterLink
           v-else-if="!isAuthenticated"
           class="button primary"
@@ -137,8 +137,8 @@ watch(userId, () => {
 
     <p v-if="actionError" class="error" role="alert">{{ actionError }}</p>
 
-    <h2 class="section-title">Chirps</h2>
-    <PostList :posts="posts" empty-text="This profile has not chirped yet." />
+    <h2 class="section-title">Barios</h2>
+    <PostList :posts="posts" empty-text="This profile has not barioed yet." />
 
     <div v-if="cursor" class="load-more">
       <button type="button" class="button" :disabled="loadingMore" @click="loadMore">
