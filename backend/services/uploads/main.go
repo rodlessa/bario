@@ -44,6 +44,46 @@ const (
 
 var idPattern = regexp.MustCompile(`^[a-f0-9]{32}$`)
 
+// uploadMigrations is shared with main_test.go so tests apply exactly the
+// schema run() uses.
+var uploadMigrations = []string{
+	`CREATE TABLE IF NOT EXISTS uploads.images (
+		id TEXT PRIMARY KEY,
+		user_id BIGINT NOT NULL,
+		filename TEXT NOT NULL,
+		content_type TEXT NOT NULL,
+		size BIGINT NOT NULL,
+		created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+	)`,
+	`ALTER TABLE uploads.images ADD COLUMN IF NOT EXISTS moderation_status TEXT NOT NULL DEFAULT 'approved'`,
+	`ALTER TABLE uploads.images ADD COLUMN IF NOT EXISTS moderation_scores JSONB`,
+	`CREATE INDEX IF NOT EXISTS images_user_id_idx ON uploads.images (user_id)`,
+	`CREATE TABLE IF NOT EXISTS uploads.moderation_audit (
+		id TEXT PRIMARY KEY,
+		user_id BIGINT NOT NULL,
+		filename TEXT NOT NULL,
+		content_type TEXT NOT NULL,
+		size BIGINT NOT NULL,
+		moderation_status TEXT NOT NULL,
+		moderation_scores JSONB,
+		reason TEXT NOT NULL DEFAULT '',
+		created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+	)`,
+	`CREATE INDEX IF NOT EXISTS moderation_audit_user_id_idx ON uploads.moderation_audit (user_id)`,
+	`CREATE INDEX IF NOT EXISTS moderation_audit_created_at_idx ON uploads.moderation_audit (created_at)`,
+	`CREATE TABLE IF NOT EXISTS uploads.quarantine (
+		id TEXT PRIMARY KEY,
+		user_id BIGINT NOT NULL,
+		filename TEXT NOT NULL,
+		content_type TEXT NOT NULL,
+		size BIGINT NOT NULL,
+		matched_by TEXT NOT NULL,
+		created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+	)`,
+	`CREATE INDEX IF NOT EXISTS quarantine_user_id_idx ON uploads.quarantine (user_id)`,
+	`CREATE INDEX IF NOT EXISTS quarantine_created_at_idx ON uploads.quarantine (created_at)`,
+}
+
 type server struct {
 	db            *sql.DB
 	tokens        *jwt.Manager
@@ -241,43 +281,7 @@ func run() error {
 	}
 	defer pool.Close()
 
-	if err := db.Migrate(ctx, pool,
-		`CREATE TABLE IF NOT EXISTS uploads.images (
-			id TEXT PRIMARY KEY,
-			user_id BIGINT NOT NULL,
-			filename TEXT NOT NULL,
-			content_type TEXT NOT NULL,
-			size BIGINT NOT NULL,
-			created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-		)`,
-		`ALTER TABLE uploads.images ADD COLUMN IF NOT EXISTS moderation_status TEXT NOT NULL DEFAULT 'approved'`,
-		`ALTER TABLE uploads.images ADD COLUMN IF NOT EXISTS moderation_scores JSONB`,
-		`CREATE INDEX IF NOT EXISTS images_user_id_idx ON uploads.images (user_id)`,
-		`CREATE TABLE IF NOT EXISTS uploads.moderation_audit (
-			id TEXT PRIMARY KEY,
-			user_id BIGINT NOT NULL,
-			filename TEXT NOT NULL,
-			content_type TEXT NOT NULL,
-			size BIGINT NOT NULL,
-			moderation_status TEXT NOT NULL,
-			moderation_scores JSONB,
-			reason TEXT NOT NULL DEFAULT '',
-			created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-		)`,
-		`CREATE INDEX IF NOT EXISTS moderation_audit_user_id_idx ON uploads.moderation_audit (user_id)`,
-		`CREATE INDEX IF NOT EXISTS moderation_audit_created_at_idx ON uploads.moderation_audit (created_at)`,
-		`CREATE TABLE IF NOT EXISTS uploads.quarantine (
-			id TEXT PRIMARY KEY,
-			user_id BIGINT NOT NULL,
-			filename TEXT NOT NULL,
-			content_type TEXT NOT NULL,
-			size BIGINT NOT NULL,
-			matched_by TEXT NOT NULL,
-			created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-		)`,
-		`CREATE INDEX IF NOT EXISTS quarantine_user_id_idx ON uploads.quarantine (user_id)`,
-		`CREATE INDEX IF NOT EXISTS quarantine_created_at_idx ON uploads.quarantine (created_at)`,
-	); err != nil {
+	if err := db.Migrate(ctx, pool, uploadMigrations...); err != nil {
 		return err
 	}
 
