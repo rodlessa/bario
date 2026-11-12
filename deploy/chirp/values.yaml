@@ -1,0 +1,121 @@
+nameOverride: ""
+fullnameOverride: ""
+
+imagePullSecrets: []
+
+# One entry per Go service. Each service exposes :8080 (API) and :9090 (metrics).
+services:
+  auth:
+    replicas: 1
+    image:
+      repository: chirp/auth
+      tag: latest
+      pullPolicy: IfNotPresent
+    resources:
+      requests:
+        cpu: 25m
+        memory: 32Mi
+      limits:
+        cpu: 250m
+        memory: 128Mi
+  posts:
+    replicas: 1
+    image:
+      repository: chirp/posts
+      tag: latest
+      pullPolicy: IfNotPresent
+    resources:
+      requests:
+        cpu: 25m
+        memory: 32Mi
+      limits:
+        cpu: 250m
+        memory: 128Mi
+  uploads:
+    replicas: 1
+    image:
+      repository: chirp/uploads
+      tag: latest
+      pullPolicy: IfNotPresent
+    resources:
+      requests:
+        cpu: 25m
+        memory: 32Mi
+      limits:
+        cpu: 250m
+        memory: 128Mi
+  follows:
+    replicas: 1
+    image:
+      repository: chirp/follows
+      tag: latest
+      pullPolicy: IfNotPresent
+    resources:
+      requests:
+        cpu: 25m
+        memory: 32Mi
+      limits:
+        cpu: 250m
+        memory: 128Mi
+
+frontend:
+  replicas: 1
+  image:
+    repository: chirp/frontend
+    tag: latest
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 250m
+      memory: 128Mi
+
+postgres:
+  image:
+    repository: postgres
+    tag: "16-alpine"
+  user: chirp
+  database: chirp
+  # Leave empty to let the chart generate a random password on first install.
+  # The generated value is stored in the Kubernetes Secret and reused on upgrade.
+  password: ""
+  storage: 1Gi
+  storageClassName: ""
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+jwt:
+  # Leave empty to generate a random shared secret on first install.
+  # Alternatively pass an existing secret with --set jwt.secret=... .
+  secret: ""
+
+uploads:
+  storage: 5Gi
+  storageClassName: ""
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations: {}
+  host: chirp.local
+
+prometheus:
+  image:
+    repository: prom/prometheus
+    tag: v2.54.1
+  retention: 6h
+  scrapeInterval: 15s
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi

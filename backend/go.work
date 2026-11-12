@@ -1,0 +1,9 @@
+go 1.24.0
+
+use (
+	./pkg
+	./services/auth
+	./services/follows
+	./services/posts
+	./services/uploads
+)

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: chirp
+description: Chirp — a small social network with Go services, a Vue SPA, PostgreSQL and Prometheus.
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
