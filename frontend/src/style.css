@@ -362,6 +362,18 @@ p {
   gap: var(--gap);
 }
 
+.feed-sentinel {
+  width: 100%;
+  height: 1px;
+}
+
+.feed-hint {
+  padding: 8px 0;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+
 .post {
   background: var(--panel);
   border: 1px solid var(--border);

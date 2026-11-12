@@ -148,13 +148,16 @@ export const api = {
     return request(`/api/posts/users/${id}/posts${cursorQuery(cursor)}`)
   },
 
-  getFeed(cursor?: string | null, pages = 0): Promise<FeedResponse> {
+  getFeed(cursor?: string | null, pages = 0, limit = 30): Promise<FeedResponse> {
     const params = new URLSearchParams()
     if (cursor) {
       params.set('cursor', cursor)
     }
     if (pages > 0) {
       params.set('pages', String(pages))
+    }
+    if (limit > 0) {
+      params.set('limit', String(limit))
     }
     const query = params.toString()
     return request(`/api/posts/feed${query ? `?${query}` : ''}`)
