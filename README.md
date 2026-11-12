@@ -10,13 +10,16 @@ Prometheus metrics on a private, cluster-only port.
 | Layer    | Tech                                                     |
 | -------- | -------------------------------------------------------- |
 | Backend  | Go (4 services: auth, posts, uploads, follows)           |
+| Moderation | Node 22 + NSFWJS sidecar (standalone, not wired in yet) |
 | Frontend | Vue 3 + TypeScript + Vite, served by nginx               |
 | Database | PostgreSQL 16, one schema per service                    |
 | Deploy   | Docker images + Helm chart + nginx Ingress               |
 | Metrics  | Prometheus, scraping cluster-only `*-metrics` Services   |
 
 Each Go service listens on `:8080` for JSON and `:9090` for `/metrics`. Both
-ports come from `HTTP_PORT` and `METRICS_PORT`.
+ports come from `HTTP_PORT` and `METRICS_PORT`. The standalone moderation
+sidecar uses `:8085` for JSON and `:9095` for `/metrics` locally; see
+`backend/services/moderation/README.md`.
 
 ## Layout
 
@@ -32,7 +35,8 @@ bario/
 │       ├── auth/             # go.mod + main.go + Dockerfile
 │       ├── posts/
 │       ├── uploads/
-│       └── follows/
+│       ├── follows/
+│       └── moderation/       # Node + NSFWJS sidecar (standalone)
 ├── frontend/                 # Vue 3 + TS + Vite + nginx
 └── deploy/bario/             # Helm chart
 ```
@@ -139,6 +143,10 @@ cd backend
 (cd services/uploads && HTTP_PORT=8084 METRICS_PORT=9094 \
   UPLOAD_DIR=/tmp/bario-uploads go run .) &
 ```
+
+The optional moderation sidecar is a separate Node service on `:8085`
+(metrics `:9095`). It is not wired into uploads yet; see
+`backend/services/moderation/README.md` to run it.
 
 Then run the SPA:
 

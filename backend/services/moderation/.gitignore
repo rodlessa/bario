@@ -1,0 +1,8 @@
+node_modules/
+npm-debug.log*
+coverage/
+
+# Local test images
+*.jpg
+*.jpeg
+*.png

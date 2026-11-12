@@ -1,0 +1,8 @@
+node_modules
+npm-debug.log*
+test
+coverage
+.DS_Store
+*.jpg
+*.jpeg
+*.png
