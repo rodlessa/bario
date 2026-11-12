@@ -153,6 +153,23 @@ The dev server listens on <http://localhost:5173> and proxies `/api/auth`,
 targets with `BARIO_AUTH_URL`, `BARIO_POSTS_URL`, `BARIO_FOLLOWS_URL`, and
 `BARIO_UPLOADS_URL` if needed.
 
+### Seed data
+
+With the four services running, `scripts/seed.sh` registers the reserved admin
+account plus nine demo users, wires an organic follow graph, and creates 3–8
+posts per user through the public HTTP APIs. It never writes to PostgreSQL
+directly.
+
+```bash
+scripts/seed.sh
+```
+
+The script is safe to rerun: existing accounts are logged in, follows are
+idempotent, and posts are only added up to each user's target. Override the
+endpoints or credentials with `AUTH_URL`, `POSTS_URL`, `FOLLOWS_URL`,
+`ADMIN_USERNAME`, and `SEED_PASSWORD`; the defaults match the ports and admin
+username above. Requires `bash`, `curl`, and `jq`.
+
 ## API
 
 All APIs are also reachable through the ingress under `/api/<service>`; the
