@@ -26,6 +26,20 @@ const schema = "auth"
 
 var usernamePattern = regexp.MustCompile(`^[A-Za-z0-9_]{3,32}$`)
 
+// authMigrations is shared with main_test.go so tests apply exactly the schema
+// run() uses.
+var authMigrations = []string{
+	`CREATE TABLE IF NOT EXISTS auth.users (
+		id BIGSERIAL PRIMARY KEY,
+		username TEXT NOT NULL UNIQUE,
+		password_hash TEXT NOT NULL,
+		email TEXT NOT NULL,
+		is_admin BOOLEAN NOT NULL DEFAULT false,
+		created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+	)`,
+	`ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT false`,
+}
+
 type server struct {
 	db            *sql.DB
 	tokens        *jwt.Manager
@@ -50,17 +64,7 @@ func run() error {
 	}
 	defer pool.Close()
 
-	if err := db.Migrate(ctx, pool,
-		`CREATE TABLE IF NOT EXISTS auth.users (
-			id BIGSERIAL PRIMARY KEY,
-			username TEXT NOT NULL UNIQUE,
-			password_hash TEXT NOT NULL,
-			email TEXT NOT NULL,
-			is_admin BOOLEAN NOT NULL DEFAULT false,
-			created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-		)`,
-		`ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT false`,
-	); err != nil {
+	if err := db.Migrate(ctx, pool, authMigrations...); err != nil {
 		return err
 	}
 
