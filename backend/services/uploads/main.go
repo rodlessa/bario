@@ -273,7 +273,12 @@ func (s *server) handleUpload(w http.ResponseWriter, r *http.Request, claims *jw
 	}
 
 	contentType := detectImageType(data)
-	if !strings.HasPrefix(contentType, "image/") {
+	// Keep this list identical to backend/services/moderation/src/images.js.
+	// Go's sniffer also returns image/x-icon for ICO, but neither tfjs nor
+	// sharp decodes ICO, so it must not reach the classifier.
+	switch contentType {
+	case "image/jpeg", "image/png", "image/gif", "image/bmp", "image/webp":
+	default:
 		bariohttp.WriteError(w, http.StatusUnsupportedMediaType, "uploaded file is not a supported image")
 		return
 	}

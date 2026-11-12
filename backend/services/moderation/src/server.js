@@ -9,8 +9,9 @@ if (typeof util.isNullOrUndefined !== 'function') {
 
 const http = require('node:http');
 const Busboy = require('busboy');
+const sharp = require('sharp');
 const { Counter, Histogram, Registry } = require('prom-client');
-const { isSupportedImage, formatProbabilities } = require('./images');
+const { detectImageFormat, formatProbabilities } = require('./images');
 
 const SERVICE = 'moderation';
 const MAX_BODY_BYTES = 10 * 1024 * 1024;
@@ -241,6 +242,26 @@ async function readImage(req) {
 
 let model = null;
 
+// TensorFlow.js cannot decode WebP, so normalise it to raw sRGB pixels with
+// sharp and build the same int32 RGB tensor tf.node.decodeImage would return.
+async function decodeInput(buffer, format) {
+    if (format !== 'webp') {
+        return tf.node.decodeImage(buffer, 3);
+    }
+
+    const { data, info } = await sharp(buffer)
+        .toColourspace('srgb')
+        .removeAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+
+    if (info.channels !== 3 || info.width <= 0 || info.height <= 0) {
+        throw new Error(`unexpected WebP shape ${info.width}x${info.height}x${info.channels}`);
+    }
+
+    return tf.tensor3d(Int32Array.from(data), [info.height, info.width, 3], 'int32');
+}
+
 async function handleClassify(req, res) {
     let buffer;
     try {
@@ -255,16 +276,17 @@ async function handleClassify(req, res) {
         sendJSON(res, 400, { error: 'image is required' });
         return;
     }
-    if (!isSupportedImage(buffer)) {
-        sendJSON(res, 400, { error: 'unsupported image format (JPEG, PNG, GIF or BMP required)' });
+    const format = detectImageFormat(buffer);
+    if (!format) {
+        sendJSON(res, 400, { error: 'unsupported image format (JPEG, PNG, GIF, BMP or WebP required)' });
         return;
     }
 
     let image;
     try {
-        image = tf.node.decodeImage(buffer, 3);
+        image = await decodeInput(buffer, format);
     } catch (err) {
-        log('warn', 'image decode failed', { error: err.message });
+        log('warn', 'image decode failed', { format, error: err.message });
         sendJSON(res, 400, { error: 'could not decode image' });
         return;
     }

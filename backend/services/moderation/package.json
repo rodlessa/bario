@@ -16,7 +16,8 @@
     "@tensorflow/tfjs-node": "4.22.0",
     "busboy": "1.6.0",
     "nsfwjs": "4.4.0",
-    "prom-client": "15.1.3"
+    "prom-client": "15.1.3",
+    "sharp": "0.35.5"
   },
   "allowScripts": {
     "@tensorflow/tfjs-node@4.22.0": true,

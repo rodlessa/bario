@@ -58,6 +58,14 @@ The schema is migrated automatically on startup: `moderation_status` and
 `uploads.moderation_audit` is created if missing. Existing images default to
 `moderation_status='approved'`.
 
+## Supported formats
+
+JPEG, PNG, GIF, BMP, and WebP. The list is identical to the moderation
+sidecar's `src/images.js`: ICO (which Go sniffs as `image/x-icon`), TIFF, and
+AVIF are rejected with `415` before moderation, so a format cannot pass
+uploads and then fail inside the classifier. WebP is decoded by the sidecar
+with `sharp`.
+
 ## API
 
 `POST /uploads` (also `/api/uploads`) takes a multipart field named `file`,

@@ -5,9 +5,10 @@ Standalone, stateless image-classification service for Bario. It runs the
 TensorFlow.js and returns the five NSFWJS class probabilities.
 
 This is a **Node sidecar**, separate from the Go services. It has no database,
-no persistence, and does not touch the uploads service yet.
+no persistence, and is called by the uploads service for every image before the
+file is stored.
 
-- **Runtime:** Node.js 22 LTS (Docker image), `@tensorflow/tfjs-node`
+- **Runtime:** Node.js 22 LTS (Docker image), `@tensorflow/tfjs-node`, `sharp`
 - **Model:** NSFWJS 4.4.0 MobileNetV2; the weights ship inside the `nsfwjs`
   npm package, so nothing is downloaded at runtime
 - **HTTP port:** `8085` (`HTTP_PORT`)
@@ -51,8 +52,12 @@ newer Node releases where `util.isNullOrUndefined` was removed.
     http://localhost:8085/classify
   ```
 
-Supported formats: JPEG, PNG, GIF, and BMP (the formats TensorFlow.js can
-decode). The response is JSON in stable class order:
+Supported formats: JPEG, PNG, GIF, BMP, and WebP. TensorFlow.js decodes the
+first four directly; WebP is normalised to raw sRGB pixels with
+[`sharp`](https://sharp.pixelplumbing.com/) and then wrapped in the same
+integer RGB tensor before classification. The accepted set matches the uploads
+service exactly: ICO (which Go sniffs as `image/x-icon`), TIFF, and AVIF are
+rejected by both sides. The response is JSON in stable class order:
 
 ```json
 {"Neutral":0.7892746925354004,"Drawing":0.20774567127227783,"Sexy":0.00000427293070970336,"Hentai":0.002954118885099888,"Porn":0.000021283674868755043}
@@ -91,8 +96,8 @@ npm test
 ```
 
 Unit tests cover image sniffing and response formatting; they do not load the
-model. For an end-to-end check, start the service and POST any JPEG/PNG as
-shown above.
+model. For an end-to-end check, start the service and POST any JPEG, PNG, or
+WebP as shown above.
 
 ## Docker
 
@@ -104,5 +109,6 @@ docker run --rm -p 8085:8085 -p 9095:9095 bario/moderation:latest
 The image uses `node:22-bookworm-slim`, installs production dependencies only,
 and bundles the model through the `nsfwjs` package. `tfjs-node` fetches its
 native `libtensorflow` runtime during the build, so the build needs network;
-runtime does not. Expect roughly 1.3 GB uncompressed because of those native
+runtime does not. `sharp` ships its own prebuilt libvips, so it needs no extra
+system packages. Expect roughly 1.3 GB uncompressed because of the native
 TensorFlow libraries (the model weights themselves are only a few MB).
