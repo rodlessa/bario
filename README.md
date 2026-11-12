@@ -328,7 +328,7 @@ Each service's metrics port is exposed only through a `ClusterIP` Service named
 `<release>-<service>-metrics`. These Services have labels
 `app.kubernetes.io/component: <service>-metrics` and are **not** referenced by
 the Ingress, which only routes `/api/auth`, `/api/posts`, `/api/uploads`,
-`/api/follows`, and `/` to the frontend. There is no NodePort, LoadBalancer, or
+`/api/follows`, `/api/ads`, and `/` to the frontend. There is no NodePort, LoadBalancer, or
 public metrics path. Prometheus scrapes the metrics Services inside the cluster.
 
 Inspect Prometheus locally with a port-forward:

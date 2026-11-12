@@ -10,9 +10,9 @@ global:
 
 imagePullSecrets: []
 
-# One entry per workload service. Go services expose :8080 (API) and :9090
-# (metrics); the moderation sidecars use their own ports (8085/9095 and
-# 8086/9096) as defined in their templates.
+# One entry per workload service. Most Go services expose :8080 (API) and
+# :9090 (metrics); ads uses :8087/:9097 and the moderation sidecars use their
+# own ports (8085/9095 and 8086/9096) as defined in their templates.
 services:
   auth:
     replicas: 1
@@ -69,6 +69,23 @@ services:
     replicas: 1
     image:
       repository: bario/follows
+      tag: latest
+      pullPolicy: IfNotPresent
+    # Optional scheduling constraints; empty keeps the scheduler defaults.
+    nodeSelector: {}
+    affinity: {}
+    tolerations: []
+    resources:
+      requests:
+        cpu: 25m
+        memory: 32Mi
+      limits:
+        cpu: 250m
+        memory: 128Mi
+  ads:
+    replicas: 1
+    image:
+      repository: bario/ads
       tag: latest
       pullPolicy: IfNotPresent
     # Optional scheduling constraints; empty keeps the scheduler defaults.

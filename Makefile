@@ -19,6 +19,8 @@ IMAGE_SETS = \
 	--set services.uploads.image.tag=$(TAG) \
 	--set services.follows.image.repository=$(REGISTRY)/follows \
 	--set services.follows.image.tag=$(TAG) \
+	--set services.ads.image.repository=$(REGISTRY)/ads \
+	--set services.ads.image.tag=$(TAG) \
 	--set frontend.image.repository=$(REGISTRY)/frontend \
 	--set frontend.image.tag=$(TAG)
 

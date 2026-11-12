@@ -46,6 +46,13 @@ spec:
                 name: {{ include "bario.serviceName" (dict "root" . "component" "follows") }}
                 port:
                   number: 8080
+          - path: /api/ads
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "bario.serviceName" (dict "root" . "component" "ads") }}
+                port:
+                  number: 8087
           - path: /
             pathType: Prefix
             backend:
