@@ -1,0 +1,19 @@
+# Go
+backend/bin/
+backend/vendor/
+
+# Node / Vue
+frontend/node_modules/
+frontend/dist/
+
+# Secrets & local config
+.env
+.env.*
+*.local
+*.pem
+*.key
+
+# OS / editor noise
+.DS_Store
+.idea/
+.vscode/
