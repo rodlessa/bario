@@ -1,0 +1,118 @@
+{{- $fullname := include "bario.fullname" . -}}
+{{- $name := printf "%s-moderation-gore" $fullname -}}
+{{- $svc := index .Values.services "moderation-gore" -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "bario.labels" . | nindent 4 }}
+    app.kubernetes.io/component: moderation-gore
+spec:
+  replicas: {{ $svc.replicas }}
+  selector:
+    matchLabels:
+      {{- include "bario.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: moderation-gore
+  template:
+    metadata:
+      labels:
+        {{- include "bario.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: moderation-gore
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: moderation-gore
+          image: "{{ $svc.image.repository }}:{{ $svc.image.tag }}"
+          imagePullPolicy: {{ $svc.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          ports:
+            - name: http
+              containerPort: 8086
+            - name: metrics
+              containerPort: 9096
+          env:
+            - name: HTTP_PORT
+              value: "8086"
+            - name: METRICS_PORT
+              value: "9096"
+            - name: HOME
+              value: /tmp
+            - name: TMPDIR
+              value: /tmp
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 2
+            failureThreshold: 30
+          resources:
+            {{- toYaml $svc.resources | nindent 12 }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "bario.labels" . | nindent 4 }}
+    app.kubernetes.io/component: moderation-gore
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "bario.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: moderation-gore
+  ports:
+    - name: http
+      port: 8086
+      targetPort: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}-metrics
+  labels:
+    {{- include "bario.labels" . | nindent 4 }}
+    app.kubernetes.io/component: moderation-gore-metrics
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "bario.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: moderation-gore
+  ports:
+    - name: metrics
+      port: 9096
+      targetPort: metrics

@@ -3,7 +3,9 @@ fullnameOverride: ""
 
 imagePullSecrets: []
 
-# One entry per Go service. Each service exposes :8080 (API) and :9090 (metrics).
+# One entry per workload service. Go services expose :8080 (API) and :9090
+# (metrics); the moderation sidecars use their own ports (8085/9095 and
+# 8086/9096) as defined in their templates.
 services:
   auth:
     replicas: 1
@@ -57,6 +59,34 @@ services:
       limits:
         cpu: 250m
         memory: 128Mi
+  moderation:
+    replicas: 1
+    image:
+      repository: bario/moderation
+      tag: latest
+      pullPolicy: IfNotPresent
+    # NSFWJS/tfjs-node: model weights are bundled in the image.
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: "1"
+        memory: 2Gi
+  moderation-gore:
+    replicas: 1
+    image:
+      repository: bario/moderation-gore
+      tag: latest
+      pullPolicy: IfNotPresent
+    # CLIP ViT-B/32 + CPU PyTorch; heavier than the NSFWJS sidecar.
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: "2"
+        memory: 3Gi
 
 frontend:
   replicas: 1
@@ -99,6 +129,12 @@ jwt:
 uploads:
   storage: 5Gi
   storageClassName: ""
+  moderation:
+    # Passed to the uploads service. The Go service defaults are the same,
+    # but keeping them here makes the policy explicit and tunable.
+    rejectThreshold: 0.7
+    goreRejectThreshold: 0.7
+    failOpen: false
 
 ingress:
   enabled: true

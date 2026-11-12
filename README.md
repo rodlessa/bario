@@ -10,17 +10,18 @@ Prometheus metrics on a private, cluster-only port.
 | Layer    | Tech                                                     |
 | -------- | -------------------------------------------------------- |
 | Backend  | Go (4 services: auth, posts, uploads, follows)           |
-| Moderation | Node 22 + NSFWJS sidecar (screens uploads)              |
+| Moderation | NSFWJS + CLIP gore sidecars (screen uploads)             |
 | Frontend | Vue 3 + TypeScript + Vite, served by nginx               |
 | Database | PostgreSQL 16, one schema per service                    |
 | Deploy   | Docker images + Helm chart + nginx Ingress               |
 | Metrics  | Prometheus, scraping cluster-only `*-metrics` Services   |
 
 Each Go service listens on `:8080` for JSON and `:9090` for `/metrics`. Both
-ports come from `HTTP_PORT` and `METRICS_PORT`. The moderation sidecar uses
-`:8085` for JSON and `:9095` for `/metrics` locally; the uploads service calls
-it at `MODERATION_URL` (default `http://localhost:8085`). See
-`backend/services/moderation/README.md` and
+ports come from `HTTP_PORT` and `METRICS_PORT`. The moderation sidecars use
+`:8085`/`:9095` (NSFWJS) and `:8086`/`:9096` (CLIP gore) locally; the uploads
+service calls them at `MODERATION_URL` and `GORE_MODERATION_URL`. See
+`backend/services/moderation/README.md`,
+`backend/services/moderation-gore/README.md`, and
 `backend/services/uploads/README.md`.
 
 Local development ports:
@@ -49,7 +50,8 @@ bario/
 │       ├── posts/
 │       ├── uploads/
 │       ├── follows/
-│       └── moderation/       # Node + NSFWJS sidecar (uploads moderation)
+│       ├── moderation/       # Node + NSFWJS sidecar (uploads moderation)
+│       └── moderation-gore/  # Python + CLIP gore sidecar
 ├── frontend/                 # Vue 3 + TS + Vite + nginx
 └── deploy/bario/             # Helm chart
 ```
@@ -72,9 +74,12 @@ kubectl wait --namespace ingress-nginx \
 
 # 3. Images
 make docker-build
+docker build -t bario/moderation:latest backend/services/moderation
+docker build -t bario/moderation-gore:latest backend/services/moderation-gore
 kind load docker-image \
   bario/auth:latest bario/posts:latest bario/uploads:latest \
-  bario/follows:latest bario/frontend:latest --name bario
+  bario/follows:latest bario/frontend:latest \
+  bario/moderation:latest bario/moderation-gore:latest --name bario
 
 # 4. Deploy
 make helm-install
@@ -127,6 +132,17 @@ make helm-install \
 # or override each service image explicitly with --set services.auth.image.repository=...
 ```
 
+The chart deploys the two moderation sidecars as internal-only ClusterIP
+services (`moderation` on 8085/9095 and `moderation-gore` on 8086/9096). Set
+their images and resources under `services.moderation` and
+`services.moderation-gore`; the uploads thresholds and fail-open behavior come
+from `uploads.moderation.*`. Neither sidecar nor its metrics port is exposed
+through the Ingress.
+
+`make docker-build` builds the Go services and frontend only. Build the
+sidecars separately with the commands in the quick start, and tag them with
+the same `REGISTRY`/`TAG` when overriding images.
+
 ## Local development without Kubernetes
 
 Start PostgreSQL with a generated password:
@@ -157,10 +173,12 @@ cd backend
   UPLOAD_DIR=/tmp/bario-uploads go run .) &
 ```
 
-The optional moderation sidecar is a separate Node service on `:8085`
-(metrics `:9095`). The uploads service calls it for every image; start the
-sidecar before uploading, otherwise uploads fail closed with `503`. See
-`backend/services/moderation/README.md` and
+The optional moderation sidecars are separate services: NSFWJS on `:8085`
+(metrics `:9095`) and CLIP gore on `:8086` (metrics `:9096`). The uploads
+service calls both for every image; start them before uploading, otherwise
+uploads fail closed with `503`. See
+`backend/services/moderation/README.md`,
+`backend/services/moderation-gore/README.md`, and
 `backend/services/uploads/README.md` to run them.
 
 Then run the SPA:

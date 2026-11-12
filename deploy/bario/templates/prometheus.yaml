@@ -37,6 +37,18 @@ data:
         static_configs:
           - targets:
               - "{{ include "bario.serviceName" (dict "root" . "component" "follows-metrics") }}:9090"
+      - job_name: bario-moderation
+        metrics_path: /metrics
+        scheme: http
+        static_configs:
+          - targets:
+              - "{{ include "bario.serviceName" (dict "root" . "component" "moderation-metrics") }}:9095"
+      - job_name: bario-moderation-gore
+        metrics_path: /metrics
+        scheme: http
+        static_configs:
+          - targets:
+              - "{{ include "bario.serviceName" (dict "root" . "component" "moderation-gore-metrics") }}:9096"
 ---
 apiVersion: apps/v1
 kind: Deployment

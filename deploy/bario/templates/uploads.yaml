@@ -75,6 +75,16 @@ spec:
               value: "9090"
             - name: UPLOAD_DIR
               value: /data/uploads
+            - name: MODERATION_URL
+              value: {{ printf "http://%s:8085" (include "bario.serviceName" (dict "root" . "component" "moderation")) | quote }}
+            - name: GORE_MODERATION_URL
+              value: {{ printf "http://%s:8086" (include "bario.serviceName" (dict "root" . "component" "moderation-gore")) | quote }}
+            - name: MODERATION_REJECT_THRESHOLD
+              value: {{ .Values.uploads.moderation.rejectThreshold | quote }}
+            - name: GORE_REJECT_THRESHOLD
+              value: {{ .Values.uploads.moderation.goreRejectThreshold | quote }}
+            - name: MODERATION_FAIL_OPEN
+              value: {{ .Values.uploads.moderation.failOpen | quote }}
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
