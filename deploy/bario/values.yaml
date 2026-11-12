@@ -236,6 +236,37 @@ prometheus:
       cpu: 500m
       memory: 512Mi
 
+nodeExporter:
+  image:
+    repository: prom/node-exporter
+    tag: v1.8.2
+  nodeSelector: {}
+  affinity: {}
+  # Empty means "tolerate every node" so the DaemonSet covers tainted masters.
+  tolerations: []
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+kubeStateMetrics:
+  image:
+    repository: registry.k8s.io/kube-state-metrics/kube-state-metrics
+    tag: v2.13.0
+  nodeSelector: {}
+  affinity: {}
+  tolerations: []
+  resources:
+    requests:
+      cpu: 20m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
 grafana:
   replicas: 1
   image:

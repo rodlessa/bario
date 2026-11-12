@@ -338,7 +338,9 @@ Each service's metrics port is exposed only through a `ClusterIP` Service named
 the Ingress, which only routes `/api/auth`, `/api/posts`, `/api/uploads`,
 `/api/follows`, `/api/ads`, `/grafana`, and `/` to the frontend. There is no
 NodePort, LoadBalancer, or public metrics path. Prometheus scrapes the metrics
-Services inside the cluster.
+Services inside the cluster, plus node-exporter for host CPU/memory,
+kube-state-metrics for Kubernetes object state, and the kubelet cAdvisor
+endpoint (through the API-server proxy) for pod and controller CPU.
 
 Inspect Prometheus locally with a port-forward:
 
@@ -348,9 +350,9 @@ kubectl -n bario port-forward svc/bario-prometheus 9090:9090
 ```
 
 Grafana is exposed at `http://<ingress-host>/grafana/`. The Prometheus
-datasource and the `Bario — Platform Overview` / `Bario — Service Detail`
-dashboards are provisioned from ConfigMaps, not created by hand. The admin
-password is generated into the `<release>-grafana` Secret:
+datasource and the `Bario — Platform Overview`, `Bario — Service Detail`, and
+`Bario — Kubernetes` dashboards are provisioned from ConfigMaps, not created by
+hand. The admin password is generated into the `<release>-grafana` Secret:
 
 ```bash
 kubectl -n bario get secret bario-grafana -o jsonpath='{.data.admin-password}' | base64 -d
