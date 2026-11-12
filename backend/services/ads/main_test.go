@@ -25,6 +25,7 @@ import (
 
 	"github.com/lib/pq"
 
+	"bario/pkg/authclient"
 	"bario/pkg/db"
 	bariohttp "bario/pkg/http"
 	"bario/pkg/jwt"
@@ -111,6 +112,10 @@ func resetAds(t *testing.T) {
 }
 
 func newTestAPI(t *testing.T) (http.Handler, *jwt.Manager) {
+	return newTestAPIWithAuth(t, nil, http.StatusOK)
+}
+
+func newTestAPIWithAuth(t *testing.T, interests []string, authStatus int) (http.Handler, *jwt.Manager) {
 	t.Helper()
 	resetAds(t)
 
@@ -118,7 +123,22 @@ func newTestAPI(t *testing.T) (http.Handler, *jwt.Manager) {
 	if err != nil {
 		t.Fatalf("new jwt manager: %v", err)
 	}
-	srv := &server{db: testPool, tokens: tokens}
+
+	authServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if authStatus != http.StatusOK {
+			http.Error(w, "auth unavailable", authStatus)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(authclient.User{
+			ID:        1,
+			Username:  "caller",
+			Interests: interests,
+		})
+	}))
+	t.Cleanup(authServer.Close)
+
+	srv := &server{db: testPool, tokens: tokens, auth: authclient.New(authServer.URL)}
 	router := bariohttp.NewRouter(metrics.New("ads"))
 	srv.registerRoutes(router)
 	return router.Handler(), tokens
@@ -150,6 +170,13 @@ type adResponse struct {
 	Status       string    `json:"status"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
+}
+
+type servedAdResponse struct {
+	ID           int64  `json:"id"`
+	AdvertiserID int64  `json:"advertiser_id"`
+	Title        string `json:"title"`
+	Body         string `json:"body"`
 }
 
 type errorResponse struct {
@@ -225,6 +252,59 @@ func createAd(t *testing.T, handler http.Handler, token string, input adInput) a
 		t.Fatalf("create ad: status = %d; body = %s", recorder.Code, recorder.Body.String())
 	}
 	return decodeResponse[adResponse](t, recorder)
+}
+
+func serveAds(t *testing.T, handler http.Handler, token string, pages, limit int) *httptest.ResponseRecorder {
+	t.Helper()
+	path := fmt.Sprintf("/ads/serve?pages=%d&limit=%d", pages, limit)
+	return requestJSON(t, handler, http.MethodGet, path, token, nil)
+}
+
+func clickAd(t *testing.T, handler http.Handler, token string, id int64) *httptest.ResponseRecorder {
+	t.Helper()
+	return requestJSON(t, handler, http.MethodPost, fmt.Sprintf("/ads/%d/click", id), token, nil)
+}
+
+func assertServedAdShape(t *testing.T, recorder *httptest.ResponseRecorder) {
+	t.Helper()
+	var payload []map[string]json.RawMessage
+	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode served ads %q: %v", recorder.Body.String(), err)
+	}
+	if len(payload) == 0 {
+		t.Fatal("no served ads to inspect")
+	}
+	ad := payload[0]
+	if len(ad) != 4 {
+		t.Fatalf("served ad has %d keys, want 4: %s", len(ad), recorder.Body.String())
+	}
+	for _, key := range []string{"id", "advertiser_id", "title", "body"} {
+		if _, ok := ad[key]; !ok {
+			t.Fatalf("served ad is missing key %q: %s", key, recorder.Body.String())
+		}
+	}
+}
+
+func impressionAdIDs(t *testing.T, userID int64) []int64 {
+	t.Helper()
+	rows, err := testPool.QueryContext(context.Background(),
+		`SELECT ad_id FROM ads.impressions WHERE user_id = $1 ORDER BY id`, userID)
+	if err != nil {
+		t.Fatalf("query impressions: %v", err)
+	}
+	defer rows.Close()
+	var ids []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			t.Fatalf("scan impression: %v", err)
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("iterate impressions: %v", err)
+	}
+	return ids
 }
 
 func TestCreateAdSuccess(t *testing.T) {
@@ -579,4 +659,274 @@ func TestUpdateAdUnauthenticated(t *testing.T) {
 
 	recorder := patchAd(t, handler, "", created.ID, "paused")
 	assertError(t, recorder, http.StatusUnauthorized, "authentication required")
+}
+
+func TestServeAdsRatio(t *testing.T) {
+	handler, tokens := newTestAPI(t)
+	advertiser := tokenFor(t, tokens, 2, "advertiser")
+	for i := 0; i < 10; i++ {
+		createAd(t, handler, advertiser, adInput{
+			Title: fmt.Sprintf("general-%02d", i), Body: "general", BudgetCents: 1,
+		})
+	}
+	caller := tokenFor(t, tokens, 1, "caller")
+
+	cases := []struct {
+		name  string
+		pages int
+		limit int
+		want  int
+	}{
+		{"zero_pages", 0, 20, 1},
+		{"five_pages", 5, 20, 3},
+		{"hundred_pages_capped", 100, 20, 6},
+		{"negative_pages_clamped", -5, 20, 1},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			recorder := serveAds(t, handler, caller, tc.pages, tc.limit)
+			if recorder.Code != http.StatusOK {
+				t.Fatalf("status = %d, want %d; body = %s", recorder.Code, http.StatusOK, recorder.Body.String())
+			}
+			ads := decodeResponse[[]servedAdResponse](t, recorder)
+			if len(ads) != tc.want {
+				t.Fatalf("ads = %d, want %d", len(ads), tc.want)
+			}
+			if len(ads) > 0 {
+				assertServedAdShape(t, recorder)
+				for i := 1; i < len(ads); i++ {
+					if ads[i-1].ID <= ads[i].ID {
+						t.Fatalf("ads are not newest-first: %v", ads)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestServeAdsTargetedOnlyWhenOverBatch(t *testing.T) {
+	handler, tokens := newTestAPIWithAuth(t, []string{"tech"}, http.StatusOK)
+	advertiser := tokenFor(t, tokens, 2, "advertiser")
+	for i := 0; i < 5; i++ {
+		createAd(t, handler, advertiser, adInput{
+			Title: fmt.Sprintf("targeted-%02d", i), Body: "targeted",
+			TargetTags: []string{"tech"}, BudgetCents: 1,
+		})
+	}
+	for i := 0; i < 3; i++ {
+		createAd(t, handler, advertiser, adInput{
+			Title: fmt.Sprintf("general-%02d", i), Body: "general", BudgetCents: 1,
+		})
+	}
+	caller := tokenFor(t, tokens, 1, "caller")
+
+	recorder := serveAds(t, handler, caller, 5, 20) // ad_count = 3
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body = %s", recorder.Code, http.StatusOK, recorder.Body.String())
+	}
+	ads := decodeResponse[[]servedAdResponse](t, recorder)
+	if len(ads) != 3 {
+		t.Fatalf("ads = %d, want 3", len(ads))
+	}
+	for _, ad := range ads {
+		if !strings.HasPrefix(ad.Title, "targeted-") {
+			t.Fatalf("non-targeted ad returned: %+v", ad)
+		}
+	}
+	if ads[0].ID <= ads[1].ID || ads[1].ID <= ads[2].ID {
+		t.Fatalf("targeted ads are not newest-first: %v", ads)
+	}
+}
+
+func TestServeAdsTargetedThenGeneralFill(t *testing.T) {
+	handler, tokens := newTestAPIWithAuth(t, []string{"tech"}, http.StatusOK)
+	advertiser := tokenFor(t, tokens, 2, "advertiser")
+	for i := 0; i < 2; i++ {
+		createAd(t, handler, advertiser, adInput{
+			Title: fmt.Sprintf("targeted-%02d", i), Body: "targeted",
+			TargetTags: []string{"tech"}, BudgetCents: 1,
+		})
+	}
+	for i := 0; i < 5; i++ {
+		createAd(t, handler, advertiser, adInput{
+			Title: fmt.Sprintf("general-%02d", i), Body: "general", BudgetCents: 1,
+		})
+	}
+	caller := tokenFor(t, tokens, 1, "caller")
+
+	ads := decodeResponse[[]servedAdResponse](t, serveAds(t, handler, caller, 5, 20))
+	if len(ads) != 3 {
+		t.Fatalf("ads = %d, want 3", len(ads))
+	}
+	if !strings.HasPrefix(ads[0].Title, "targeted-") || !strings.HasPrefix(ads[1].Title, "targeted-") {
+		t.Fatalf("targeted ads are not first: %v", ads)
+	}
+	if !strings.HasPrefix(ads[2].Title, "general-") {
+		t.Fatalf("remaining slot was not filled from general: %v", ads)
+	}
+}
+
+func TestServeAdsGeneralOnlyWithoutInterests(t *testing.T) {
+	handler, tokens := newTestAPIWithAuth(t, nil, http.StatusOK)
+	advertiser := tokenFor(t, tokens, 2, "advertiser")
+	for i := 0; i < 2; i++ {
+		createAd(t, handler, advertiser, adInput{
+			Title: fmt.Sprintf("targeted-%02d", i), Body: "targeted",
+			TargetTags: []string{"tech"}, BudgetCents: 1,
+		})
+	}
+	for i := 0; i < 2; i++ {
+		createAd(t, handler, advertiser, adInput{
+			Title: fmt.Sprintf("general-%02d", i), Body: "general", BudgetCents: 1,
+		})
+	}
+	caller := tokenFor(t, tokens, 1, "caller")
+
+	ads := decodeResponse[[]servedAdResponse](t, serveAds(t, handler, caller, 5, 20))
+	if len(ads) != 2 {
+		t.Fatalf("ads = %d, want 2", len(ads))
+	}
+	for _, ad := range ads {
+		if !strings.HasPrefix(ad.Title, "general-") {
+			t.Fatalf("targeted ad served without interests: %+v", ad)
+		}
+	}
+}
+
+func TestServeAdsGeneralOnlyWhenNoOverlap(t *testing.T) {
+	handler, tokens := newTestAPIWithAuth(t, []string{"sports"}, http.StatusOK)
+	advertiser := tokenFor(t, tokens, 2, "advertiser")
+	for i := 0; i < 2; i++ {
+		createAd(t, handler, advertiser, adInput{
+			Title: fmt.Sprintf("targeted-%02d", i), Body: "targeted",
+			TargetTags: []string{"tech"}, BudgetCents: 1,
+		})
+	}
+	for i := 0; i < 2; i++ {
+		createAd(t, handler, advertiser, adInput{
+			Title: fmt.Sprintf("general-%02d", i), Body: "general", BudgetCents: 1,
+		})
+	}
+	caller := tokenFor(t, tokens, 1, "caller")
+
+	ads := decodeResponse[[]servedAdResponse](t, serveAds(t, handler, caller, 5, 20))
+	if len(ads) != 2 {
+		t.Fatalf("ads = %d, want 2", len(ads))
+	}
+	for _, ad := range ads {
+		if !strings.HasPrefix(ad.Title, "general-") {
+			t.Fatalf("non-overlapping targeted ad served: %+v", ad)
+		}
+	}
+}
+
+func TestServeAdsEmpty(t *testing.T) {
+	handler, tokens := newTestAPI(t)
+	caller := tokenFor(t, tokens, 1, "caller")
+
+	recorder := serveAds(t, handler, caller, 5, 20)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body = %s", recorder.Code, http.StatusOK, recorder.Body.String())
+	}
+	if strings.TrimSpace(recorder.Body.String()) != "[]" {
+		t.Fatalf("body = %s, want []", recorder.Body.String())
+	}
+	if got := impressionAdIDs(t, 1); len(got) != 0 {
+		t.Fatalf("impressions = %v, want none", got)
+	}
+}
+
+func TestServeAdsRecordsImpressions(t *testing.T) {
+	handler, tokens := newTestAPI(t)
+	advertiser := tokenFor(t, tokens, 2, "advertiser")
+	first := createAd(t, handler, advertiser, adInput{Title: "general-0", Body: "general", BudgetCents: 1})
+	second := createAd(t, handler, advertiser, adInput{Title: "general-1", Body: "general", BudgetCents: 1})
+	caller := tokenFor(t, tokens, 1, "caller")
+
+	ads := decodeResponse[[]servedAdResponse](t, serveAds(t, handler, caller, 5, 20))
+	if len(ads) != 2 {
+		t.Fatalf("ads = %d, want 2", len(ads))
+	}
+	got := impressionAdIDs(t, 1)
+	want := []int64{second.ID, first.ID}
+	if !slices.Equal(got, want) {
+		t.Fatalf("impression ad ids = %v, want %v", got, want)
+	}
+}
+
+func TestServeAdsAuthDownDegradesToGeneral(t *testing.T) {
+	handler, tokens := newTestAPIWithAuth(t, nil, http.StatusInternalServerError)
+	advertiser := tokenFor(t, tokens, 2, "advertiser")
+	createAd(t, handler, advertiser, adInput{
+		Title: "targeted-0", Body: "targeted", TargetTags: []string{"tech"}, BudgetCents: 1,
+	})
+	createAd(t, handler, advertiser, adInput{Title: "general-0", Body: "general", BudgetCents: 1})
+	caller := tokenFor(t, tokens, 1, "caller")
+
+	recorder := serveAds(t, handler, caller, 5, 20)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body = %s", recorder.Code, http.StatusOK, recorder.Body.String())
+	}
+	ads := decodeResponse[[]servedAdResponse](t, recorder)
+	if len(ads) != 1 || !strings.HasPrefix(ads[0].Title, "general-") {
+		t.Fatalf("auth-down ads = %+v, want general-only", ads)
+	}
+}
+
+func TestClickAdSuccess(t *testing.T) {
+	handler, tokens := newTestAPI(t)
+	advertiser := tokenFor(t, tokens, 2, "advertiser")
+	ad := createAd(t, handler, advertiser, adInput{Title: "Click", Body: "Click me", BudgetCents: 1})
+	clicker := tokenFor(t, tokens, 1, "clicker")
+
+	recorder := clickAd(t, handler, clicker, ad.ID)
+	if recorder.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want %d; body = %s", recorder.Code, http.StatusNoContent, recorder.Body.String())
+	}
+	if recorder.Body.Len() != 0 {
+		t.Fatalf("click body = %q, want empty", recorder.Body.String())
+	}
+
+	var adID, userID int64
+	if err := testPool.QueryRowContext(context.Background(),
+		`SELECT ad_id, user_id FROM ads.clicks ORDER BY id DESC LIMIT 1`).Scan(&adID, &userID); err != nil {
+		t.Fatalf("query click: %v", err)
+	}
+	if adID != ad.ID || userID != 1 {
+		t.Fatalf("click = ad:%d user:%d", adID, userID)
+	}
+
+	// Clicking one's own ad is allowed too.
+	if recorder := clickAd(t, handler, advertiser, ad.ID); recorder.Code != http.StatusNoContent {
+		t.Fatalf("owner click status = %d", recorder.Code)
+	}
+	var count int
+	if err := testPool.QueryRowContext(context.Background(), `SELECT count(*) FROM ads.clicks`).Scan(&count); err != nil {
+		t.Fatalf("count clicks: %v", err)
+	}
+	if count != 2 {
+		t.Fatalf("clicks = %d, want 2", count)
+	}
+}
+
+func TestClickAdNotFound(t *testing.T) {
+	handler, tokens := newTestAPI(t)
+	clicker := tokenFor(t, tokens, 1, "clicker")
+
+	recorder := clickAd(t, handler, clicker, 999999)
+	assertError(t, recorder, http.StatusNotFound, "ad not found")
+}
+
+func TestServeAndClickUnauthenticated(t *testing.T) {
+	handler, _ := newTestAPI(t)
+
+	t.Run("serve", func(t *testing.T) {
+		recorder := requestJSON(t, handler, http.MethodGet, "/ads/serve?limit=20", "", nil)
+		assertError(t, recorder, http.StatusUnauthorized, "authentication required")
+	})
+
+	t.Run("click", func(t *testing.T) {
+		recorder := clickAd(t, handler, "", 1)
+		assertError(t, recorder, http.StatusUnauthorized, "authentication required")
+	})
 }

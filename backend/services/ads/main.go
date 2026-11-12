@@ -4,9 +4,11 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"log/slog"
+	"math"
 	"net/http"
 	"os"
 	"strconv"
@@ -16,6 +18,7 @@ import (
 
 	"github.com/lib/pq"
 
+	"bario/pkg/authclient"
 	"bario/pkg/db"
 	bariohttp "bario/pkg/http"
 	"bario/pkg/jwt"
@@ -70,6 +73,7 @@ var adsMigrations = []string{
 type server struct {
 	db     *sql.DB
 	tokens *jwt.Manager
+	auth   *authclient.Client
 }
 
 type ad struct {
@@ -82,6 +86,13 @@ type ad struct {
 	Status       string    `json:"status"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
+}
+
+type servedAd struct {
+	ID           int64  `json:"id"`
+	AdvertiserID int64  `json:"advertiser_id"`
+	Title        string `json:"title"`
+	Body         string `json:"body"`
 }
 
 type createAdRequest struct {
@@ -122,7 +133,11 @@ func run() error {
 		return err
 	}
 
-	srv := &server{db: pool, tokens: tokens}
+	srv := &server{
+		db:     pool,
+		tokens: tokens,
+		auth:   authclient.New(env("AUTH_URL", "http://localhost:8081")),
+	}
 	m := metrics.New("ads")
 	router := bariohttp.NewRouter(m)
 	srv.registerRoutes(router)
@@ -137,6 +152,8 @@ func (s *server) registerRoutes(router *bariohttp.Router) {
 	create := bariohttp.RequireAuth(s.tokens, s.handleCreateAd)
 	list := bariohttp.RequireAuth(s.tokens, s.handleListAds)
 	update := bariohttp.RequireAuth(s.tokens, s.handleUpdateAd)
+	serve := bariohttp.RequireAuth(s.tokens, s.handleServeAds)
+	click := bariohttp.RequireAuth(s.tokens, s.handleClickAd)
 
 	router.Post("/ads", "create_ad", create)
 	router.Post("/api/ads", "create_ad", create)
@@ -144,6 +161,10 @@ func (s *server) registerRoutes(router *bariohttp.Router) {
 	router.Get("/api/ads", "list_ads", list)
 	router.Patch("/ads/{id}", "update_ad", update)
 	router.Patch("/api/ads/{id}", "update_ad", update)
+	router.Get("/ads/serve", "serve_ads", serve)
+	router.Get("/api/ads/serve", "serve_ads", serve)
+	router.Post("/ads/{id}/click", "click_ad", click)
+	router.Post("/api/ads/{id}/click", "click_ad", click)
 }
 
 func (s *server) handleCreateAd(w http.ResponseWriter, r *http.Request, claims *jwt.Claims) {
@@ -256,6 +277,169 @@ func (s *server) handleUpdateAd(w http.ResponseWriter, r *http.Request, claims *
 	}
 
 	bariohttp.WriteJSON(w, http.StatusOK, updated)
+}
+
+func (s *server) handleServeAds(w http.ResponseWriter, r *http.Request, claims *jwt.Claims) {
+	pages, limit, ok := parseServeParams(w, r)
+	if !ok {
+		return
+	}
+
+	ratio := math.Min(0.30, 0.05+0.02*float64(pages))
+	adCount := int(math.Round(ratio * float64(limit)))
+	if adCount < 0 {
+		adCount = 0
+	}
+	if adCount == 0 {
+		bariohttp.WriteJSON(w, http.StatusOK, []servedAd{})
+		return
+	}
+
+	interests := s.callerInterests(r.Context(), claims.UserID)
+	ads := make([]servedAd, 0, adCount)
+
+	if len(interests) > 0 {
+		targeted, err := s.queryServedAds(r.Context(),
+			`SELECT id, advertiser_id, title, body
+			 FROM ads.advertisements
+			 WHERE status = 'active' AND target_tags && $1
+			 ORDER BY id DESC
+			 LIMIT $2`,
+			pq.Array(interests), adCount,
+		)
+		if err != nil {
+			slog.Error("serve targeted ads", "error", err, "user_id", claims.UserID)
+			bariohttp.WriteError(w, http.StatusInternalServerError, "could not load ads")
+			return
+		}
+		ads = append(ads, targeted...)
+	}
+
+	remaining := adCount - len(ads)
+	if remaining > 0 {
+		general, err := s.queryServedAds(r.Context(),
+			`SELECT id, advertiser_id, title, body
+			 FROM ads.advertisements
+			 WHERE status = 'active' AND target_tags = '{}'::text[]
+			 ORDER BY id DESC
+			 LIMIT $1`,
+			remaining,
+		)
+		if err != nil {
+			slog.Error("serve general ads", "error", err, "user_id", claims.UserID)
+			bariohttp.WriteError(w, http.StatusInternalServerError, "could not load ads")
+			return
+		}
+		ads = append(ads, general...)
+	}
+
+	for _, ad := range ads {
+		if _, err := s.db.ExecContext(r.Context(),
+			`INSERT INTO ads.impressions (ad_id, user_id) VALUES ($1, $2)`,
+			ad.ID, claims.UserID,
+		); err != nil {
+			slog.Warn("record impression", "error", err, "ad_id", ad.ID, "user_id", claims.UserID)
+		}
+	}
+
+	bariohttp.WriteJSON(w, http.StatusOK, ads)
+}
+
+func parseServeParams(w http.ResponseWriter, r *http.Request) (pages, limit int, ok bool) {
+	pages = 0
+	if raw := r.URL.Query().Get("pages"); raw != "" {
+		value, err := strconv.Atoi(raw)
+		if err != nil {
+			bariohttp.WriteError(w, http.StatusBadRequest, "invalid pages")
+			return 0, 0, false
+		}
+		if value > 0 {
+			pages = value
+		}
+	}
+
+	rawLimit := r.URL.Query().Get("limit")
+	if rawLimit == "" {
+		bariohttp.WriteError(w, http.StatusBadRequest, "limit is required")
+		return 0, 0, false
+	}
+	value, err := strconv.Atoi(rawLimit)
+	if err != nil {
+		bariohttp.WriteError(w, http.StatusBadRequest, "invalid limit")
+		return 0, 0, false
+	}
+	if value < 1 {
+		value = 1
+	}
+	return pages, value, true
+}
+
+func (s *server) callerInterests(ctx context.Context, userID int64) []string {
+	if s.auth == nil {
+		return []string{}
+	}
+	user, err := s.auth.User(ctx, userID)
+	if err != nil {
+		// Ads serving degrades to general-only when identity lookup fails.
+		slog.Warn("load caller interests", "error", err, "user_id", userID)
+		return []string{}
+	}
+	if len(user.Interests) == 0 {
+		return []string{}
+	}
+	return user.Interests
+}
+
+func (s *server) queryServedAds(ctx context.Context, query string, args ...any) ([]servedAd, error) {
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	ads := make([]servedAd, 0)
+	for rows.Next() {
+		var ad servedAd
+		if err := rows.Scan(&ad.ID, &ad.AdvertiserID, &ad.Title, &ad.Body); err != nil {
+			return nil, err
+		}
+		ads = append(ads, ad)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return ads, nil
+}
+
+func (s *server) handleClickAd(w http.ResponseWriter, r *http.Request, claims *jwt.Claims) {
+	id, ok := parseID(w, r.PathValue("id"))
+	if !ok {
+		return
+	}
+
+	result, err := s.db.ExecContext(r.Context(),
+		`INSERT INTO ads.clicks (ad_id, user_id)
+		 SELECT $1, $2
+		 WHERE EXISTS (SELECT 1 FROM ads.advertisements WHERE id = $1)`,
+		id, claims.UserID,
+	)
+	if err != nil {
+		slog.Error("record click", "error", err, "ad_id", id, "user_id", claims.UserID)
+		bariohttp.WriteError(w, http.StatusInternalServerError, "could not record click")
+		return
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		slog.Error("click rows affected", "error", err, "ad_id", id, "user_id", claims.UserID)
+		bariohttp.WriteError(w, http.StatusInternalServerError, "could not record click")
+		return
+	}
+	if affected == 0 {
+		bariohttp.WriteError(w, http.StatusNotFound, "ad not found")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *server) handleListAds(w http.ResponseWriter, r *http.Request, claims *jwt.Claims) {

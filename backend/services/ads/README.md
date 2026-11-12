@@ -93,11 +93,56 @@ or a nonexistent id returns `404` (the two cases are indistinguishable to
 avoid leaking which ids exist). Success returns the full updated ad and
 advances `updated_at`.
 
+### `GET /ads/serve` (also `/api/ads/serve`)
+
+Requires auth. Query parameters:
+
+- `pages`: number of feed pages already loaded, default `0`; negative values clamp to `0`.
+- `limit`: the caller's feed page size; required, non-integer values return `400`,
+  and values `<= 0` clamp to `1`.
+
+Ad count is computed deterministically:
+
+```text
+ratio    = min(0.30, 0.05 + 0.02 * pages)
+ad_count = round(ratio * limit)   # standard rounding, 0.5 rounds up
+```
+
+Examples: `pages=0&limit=20` → 1 ad, `pages=5&limit=20` → 3 ads,
+`pages=100&limit=20` → 6 ads (ratio capped at 0.30).
+
+The caller's `interests` are loaded from the auth service (`AUTH_URL`, default
+`http://localhost:8081`). If that lookup fails, serving degrades to
+general-only with a warning instead of failing the request. Selection order:
+
+1. Active ads whose `target_tags` overlap the caller's interests, newest first.
+2. Remaining slots filled by active ads with empty `target_tags`, newest first.
+3. If fewer active ads exist than calculated `ad_count`, return what exists;
+   never error for insufficient inventory.
+
+Each returned ad also inserts an `ads.impressions` row for the caller
+(best-effort; insert failures are logged but do not fail the response). The
+response is an array of `{id, advertiser_id, title, body}`.
+
+```bash
+curl -s "http://localhost:8087/ads/serve?pages=5&limit=20" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### `POST /ads/{id}/click` (also `/api/ads/{id}/click`)
+
+Requires auth. Inserts one `ads.clicks` row. Any authenticated user may click
+any existing ad, including their own. Success is `204`; a nonexistent ad id
+returns `404`.
+
+```bash
+curl -s -X POST http://localhost:8087/ads/1/click \
+  -H "Authorization: Bearer $TOKEN"
+```
+
 ### `GET /healthz` (also `/api/ads/healthz`)
 
 Returns `{"status":"ok"}`.
-
-Not implemented yet: `POST /ads/{id}/click`, `GET /ads/serve`.
 
 ## Run locally
 
@@ -110,10 +155,11 @@ cd backend/services/ads
 go run .
 ```
 
-Migrations run automatically on startup. Override `HTTP_PORT` and
-`METRICS_PORT` if needed. Metrics are exposed separately at
-`http://localhost:9097/metrics` with endpoint labels `create_ad`, `list_ads`,
-and `update_ad` (plus `health`).
+Migrations run automatically on startup. Override `HTTP_PORT`,
+`METRICS_PORT`, and `AUTH_URL` (default `http://localhost:8081`) if needed.
+Metrics are exposed separately at `http://localhost:9097/metrics` with
+endpoint labels `create_ad`, `list_ads`, `update_ad`, `serve_ads`, and
+`click_ad` (plus `health`).
 
 ## Tests
 

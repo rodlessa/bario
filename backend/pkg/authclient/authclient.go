@@ -15,8 +15,9 @@ import (
 
 // User is the public profile shape returned by the auth service.
 type User struct {
-	ID       int64  `json:"id"`
-	Username string `json:"username"`
+	ID        int64    `json:"id"`
+	Username  string   `json:"username"`
+	Interests []string `json:"interests"`
 }
 
 // Client talks to the auth service's JSON API.
