@@ -20,6 +20,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"bario/pkg/db"
@@ -43,10 +44,11 @@ type server struct {
 	tokens     *jwt.Manager
 	uploadDir  string
 	moderation *moderationClient
+	gore       *goreClient
 }
 
-// moderationScores is the exact JSON object returned by the NSFWJS sidecar.
-type moderationScores struct {
+// nsfwScores is the exact JSON object returned by the NSFWJS sidecar.
+type nsfwScores struct {
 	Neutral float64 `json:"Neutral"`
 	Drawing float64 `json:"Drawing"`
 	Sexy    float64 `json:"Sexy"`
@@ -55,7 +57,7 @@ type moderationScores struct {
 }
 
 // risky sums the classes that trigger a rejection.
-func (s moderationScores) risky(includeSexy bool) float64 {
+func (s nsfwScores) risky(includeSexy bool) float64 {
 	total := s.Porn + s.Hentai
 	if includeSexy {
 		total += s.Sexy
@@ -65,8 +67,36 @@ func (s moderationScores) risky(includeSexy bool) float64 {
 
 // valid rejects malformed classifier responses so a broken sidecar cannot
 // silently approve everything.
-func (s moderationScores) valid() bool {
-	values := []float64{s.Neutral, s.Drawing, s.Sexy, s.Hentai, s.Porn}
+func (s nsfwScores) valid() bool {
+	return validProbabilities(s.Neutral, s.Drawing, s.Sexy, s.Hentai, s.Porn)
+}
+
+// goreScores is the exact JSON object returned by the CLIP gore sidecar.
+type goreScores struct {
+	GraphicViolence float64 `json:"graphic violence"`
+	Gore            float64 `json:"gore"`
+	Blood           float64 `json:"blood"`
+	NormalPhoto     float64 `json:"a normal photo"`
+	EverydayScene   float64 `json:"everyday scene"`
+}
+
+// risky sums the explicit violence/gore/blood prompts. The neutral control
+// prompts are deliberately excluded.
+func (s goreScores) risky() float64 {
+	return s.GraphicViolence + s.Gore + s.Blood
+}
+
+func (s goreScores) valid() bool {
+	return validProbabilities(s.GraphicViolence, s.Gore, s.Blood, s.NormalPhoto, s.EverydayScene)
+}
+
+// combinedScores is the JSONB shape stored in moderation_scores.
+type combinedScores struct {
+	NSFW *nsfwScores `json:"nsfw"`
+	Gore *goreScores `json:"gore"`
+}
+
+func validProbabilities(values ...float64) bool {
 	sum := 0.0
 	for _, value := range values {
 		if math.IsNaN(value) || math.IsInf(value, 0) || value < 0 || value > 1 {
@@ -83,7 +113,8 @@ type moderationClient struct {
 	httpClient  *http.Client
 	threshold   float64
 	includeSexy bool
-	failOpen    bool
+	// failOpen is the shared policy for both classifiers (MODERATION_FAIL_OPEN).
+	failOpen bool
 }
 
 func newModerationClient(baseURL string, threshold float64, includeSexy, failOpen bool) *moderationClient {
@@ -96,37 +127,71 @@ func newModerationClient(baseURL string, threshold float64, includeSexy, failOpe
 	}
 }
 
-func (c *moderationClient) classify(ctx context.Context, data []byte, contentType string) (moderationScores, error) {
-	var scores moderationScores
+// goreClient posts raw image bytes to the CLIP gore sidecar.
+type goreClient struct {
+	baseURL    string
+	httpClient *http.Client
+	threshold  float64
+}
 
+func newGoreClient(baseURL string, threshold float64) *goreClient {
+	return &goreClient{
+		baseURL:    strings.TrimRight(baseURL, "/"),
+		httpClient: &http.Client{Timeout: moderationTimeout},
+		threshold:  threshold,
+	}
+}
+
+// postClassify sends the image to one sidecar and decodes its JSON response.
+// The caller is responsible for validating the returned probabilities.
+func postClassify(ctx context.Context, httpClient *http.Client, baseURL string, data []byte, contentType string, out any) error {
 	ctx, cancel := context.WithTimeout(ctx, moderationTimeout)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/classify", bytes.NewReader(data))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+"/classify", bytes.NewReader(data))
 	if err != nil {
-		return scores, err
+		return err
 	}
 	req.Header.Set("Content-Type", contentType)
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
-		return scores, err
+		return err
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, moderationMaxResponse))
 	if err != nil {
-		return scores, err
+		return err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return scores, fmt.Errorf("moderation service returned %s", resp.Status)
+		return fmt.Errorf("classifier returned %s", resp.Status)
 	}
-	if err := json.Unmarshal(body, &scores); err != nil {
-		return scores, fmt.Errorf("decode moderation response: %w", err)
+	if err := json.Unmarshal(body, out); err != nil {
+		return fmt.Errorf("decode classifier response: %w", err)
+	}
+	return nil
+}
+
+func (c *moderationClient) classify(ctx context.Context, data []byte, contentType string) (nsfwScores, error) {
+	var scores nsfwScores
+	if err := postClassify(ctx, c.httpClient, c.baseURL, data, contentType, &scores); err != nil {
+		return scores, err
 	}
 	if !scores.valid() {
-		return scores, errors.New("moderation service returned invalid probabilities")
+		return scores, errors.New("classifier returned invalid probabilities")
+	}
+	return scores, nil
+}
+
+func (c *goreClient) classify(ctx context.Context, data []byte, contentType string) (goreScores, error) {
+	var scores goreScores
+	if err := postClassify(ctx, c.httpClient, c.baseURL, data, contentType, &scores); err != nil {
+		return scores, err
+	}
+	if !scores.valid() {
+		return scores, errors.New("classifier returned invalid probabilities")
 	}
 	return scores, nil
 }
@@ -192,8 +257,15 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	if math.IsNaN(threshold) || math.IsInf(threshold, 0) || threshold < 0 || threshold > 1 {
-		return errors.New("MODERATION_REJECT_THRESHOLD must be a number between 0 and 1")
+	if err := validateThreshold("MODERATION_REJECT_THRESHOLD", threshold); err != nil {
+		return err
+	}
+	goreThreshold, err := envFloat("GORE_REJECT_THRESHOLD", 0.7)
+	if err != nil {
+		return err
+	}
+	if err := validateThreshold("GORE_REJECT_THRESHOLD", goreThreshold); err != nil {
+		return err
 	}
 	includeSexy, err := envBool("MODERATION_INCLUDE_SEXY", false)
 	if err != nil {
@@ -204,9 +276,12 @@ func run() error {
 		return err
 	}
 	moderationURL := env("MODERATION_URL", "http://localhost:8085")
+	goreURL := env("GORE_MODERATION_URL", "http://localhost:8086")
 	slog.Info("moderation configured",
-		"url", moderationURL,
+		"nsfw_url", moderationURL,
+		"gore_url", goreURL,
 		"reject_threshold", threshold,
+		"gore_reject_threshold", goreThreshold,
 		"include_sexy", includeSexy,
 		"fail_open", failOpen,
 	)
@@ -216,6 +291,7 @@ func run() error {
 		tokens:     tokens,
 		uploadDir:  uploadDir,
 		moderation: newModerationClient(moderationURL, threshold, includeSexy, failOpen),
+		gore:       newGoreClient(goreURL, goreThreshold),
 	}
 	m := metrics.New("uploads")
 	router := bariohttp.NewRouter(m)
@@ -296,46 +372,104 @@ func (s *server) handleUpload(w http.ResponseWriter, r *http.Request, claims *jw
 	}
 	filename = truncate(filename, 200)
 
-	scores, modErr := s.moderation.classify(r.Context(), data, contentType)
-	if modErr != nil {
-		slog.Error("moderate image", "error", modErr, "user_id", claims.UserID)
-		if s.moderation.failOpen {
-			slog.Warn("moderation failed open; accepting upload", "id", id, "user_id", claims.UserID)
-			if err := s.storeImage(r.Context(), id, claims.UserID, filename, contentType, data, "unavailable", nil); err != nil {
-				slog.Error("store image", "error", err, "id", id)
-				bariohttp.WriteError(w, http.StatusInternalServerError, "could not store image")
-				return
-			}
-			bariohttp.WriteJSON(w, http.StatusCreated, map[string]string{
-				"id":  id,
-				"url": "/api/uploads/" + id,
-			})
-			return
-		}
+	var (
+		nsfwResult nsfwScores
+		goreResult goreScores
+		nsfwErr    error
+		goreErr    error
+	)
 
-		s.recordModerationAudit(r.Context(), id, claims.UserID, filename, contentType, len(data), "error", nil, modErr.Error())
-		bariohttp.WriteError(w, http.StatusServiceUnavailable, "image moderation is unavailable; try again later")
-		return
+	// The sidecars are independent, so classify concurrently instead of
+	// paying their latencies serially.
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		nsfwResult, nsfwErr = s.moderation.classify(r.Context(), data, contentType)
+	}()
+	go func() {
+		defer wg.Done()
+		goreResult, goreErr = s.gore.classify(r.Context(), data, contentType)
+	}()
+	wg.Wait()
+
+	scores := &combinedScores{}
+	if nsfwErr == nil {
+		scores.NSFW = &nsfwResult
+	}
+	if goreErr == nil {
+		scores.Gore = &goreResult
 	}
 
-	risky := scores.risky(s.moderation.includeSexy)
-	if risky >= s.moderation.threshold {
-		reason := fmt.Sprintf("porn+hentai=%.4f >= threshold %g", scores.Porn+scores.Hentai, s.moderation.threshold)
-		if s.moderation.includeSexy {
-			reason = fmt.Sprintf("porn+hentai+sexy=%.4f >= threshold %g", risky, s.moderation.threshold)
+	var reasons []string
+	rejected := false
+
+	if nsfwErr == nil {
+		risky := nsfwResult.risky(s.moderation.includeSexy)
+		if risky >= s.moderation.threshold {
+			rejected = true
+			if s.moderation.includeSexy {
+				reasons = append(reasons, fmt.Sprintf(
+					"nsfw: porn+hentai+sexy=%.4f >= threshold %g", risky, s.moderation.threshold))
+			} else {
+				reasons = append(reasons, fmt.Sprintf(
+					"nsfw: porn+hentai=%.4f >= threshold %g", risky, s.moderation.threshold))
+			}
 		}
+	}
+
+	if goreErr == nil {
+		risky := goreResult.risky()
+		if risky >= s.gore.threshold {
+			rejected = true
+			reasons = append(reasons, fmt.Sprintf(
+				"gore: graphic_violence+gore+blood=%.4f >= threshold %g", risky, s.gore.threshold))
+		}
+	}
+
+	if nsfwErr != nil {
+		reasons = append(reasons, fmt.Sprintf("nsfw: classifier error: %v", nsfwErr))
+	}
+	if goreErr != nil {
+		reasons = append(reasons, fmt.Sprintf("gore: classifier error: %v", goreErr))
+	}
+
+	if rejected {
+		reason := strings.Join(reasons, "; ")
 		slog.Warn("image rejected by moderation",
 			"id", id,
 			"user_id", claims.UserID,
-			"risky_score", risky,
-			"threshold", s.moderation.threshold,
+			"reasons", reason,
 		)
-		s.recordModerationAudit(r.Context(), id, claims.UserID, filename, contentType, len(data), "rejected", &scores, reason)
+		s.recordModerationAudit(r.Context(), id, claims.UserID, filename, contentType, len(data), "rejected", scores, reason)
 		bariohttp.WriteError(w, http.StatusUnavailableForLegalReasons, "image rejected by content moderation")
 		return
 	}
 
-	if err := s.storeImage(r.Context(), id, claims.UserID, filename, contentType, data, "approved", &scores); err != nil {
+	if nsfwErr != nil || goreErr != nil {
+		reason := strings.Join(reasons, "; ")
+		slog.Error("moderation failed", "id", id, "user_id", claims.UserID, "reasons", reason)
+
+		if !s.moderation.failOpen {
+			s.recordModerationAudit(r.Context(), id, claims.UserID, filename, contentType, len(data), "error", scores, reason)
+			bariohttp.WriteError(w, http.StatusServiceUnavailable, "image moderation is unavailable; try again later")
+			return
+		}
+
+		slog.Warn("moderation failed open; accepting upload", "id", id, "user_id", claims.UserID)
+		if err := s.storeImage(r.Context(), id, claims.UserID, filename, contentType, data, "unavailable", scores); err != nil {
+			slog.Error("store image", "error", err, "id", id)
+			bariohttp.WriteError(w, http.StatusInternalServerError, "could not store image")
+			return
+		}
+		bariohttp.WriteJSON(w, http.StatusCreated, map[string]string{
+			"id":  id,
+			"url": "/api/uploads/" + id,
+		})
+		return
+	}
+
+	if err := s.storeImage(r.Context(), id, claims.UserID, filename, contentType, data, "approved", scores); err != nil {
 		slog.Error("store image", "error", err, "id", id)
 		bariohttp.WriteError(w, http.StatusInternalServerError, "could not store image")
 		return
@@ -349,7 +483,7 @@ func (s *server) handleUpload(w http.ResponseWriter, r *http.Request, claims *jw
 
 // storeImage writes an accepted image and its metadata. Rejected uploads must
 // never reach this method.
-func (s *server) storeImage(ctx context.Context, id string, userID int64, filename, contentType string, data []byte, status string, scores *moderationScores) error {
+func (s *server) storeImage(ctx context.Context, id string, userID int64, filename, contentType string, data []byte, status string, scores *combinedScores) error {
 	var scoresJSON any
 	if scores != nil {
 		encoded, err := json.Marshal(scores)
@@ -382,7 +516,7 @@ func (s *server) storeImage(ctx context.Context, id string, userID int64, filena
 // recordModerationAudit records rejected and failed uploads separately from
 // uploads.images, so that table only ever references files that exist. It uses
 // a detached context so a client disconnect cannot erase the audit trail.
-func (s *server) recordModerationAudit(ctx context.Context, id string, userID int64, filename, contentType string, size int, status string, scores *moderationScores, reason string) {
+func (s *server) recordModerationAudit(ctx context.Context, id string, userID int64, filename, contentType string, size int, status string, scores *combinedScores, reason string) {
 	var scoresJSON any
 	if scores != nil {
 		encoded, err := json.Marshal(scores)
@@ -504,6 +638,13 @@ func envFloat(key string, fallback float64) (float64, error) {
 		return 0, fmt.Errorf("%s must be a number: %w", key, err)
 	}
 	return value, nil
+}
+
+func validateThreshold(name string, value float64) error {
+	if math.IsNaN(value) || math.IsInf(value, 0) || value < 0 || value > 1 {
+		return fmt.Errorf("%s must be a number between 0 and 1", name)
+	}
+	return nil
 }
 
 func envBool(key string, fallback bool) (bool, error) {
