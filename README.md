@@ -118,6 +118,10 @@ and resources. Secrets are never committed:
   `postgres:16-alpine`. Running the pod as that user makes the image entrypoint
   skip its `su-exec postgres` step, which hangs in the k3s pod environment.
   Only override this if the image's postgres user changes.
+- `postgres.containerSecurityContext` runs the postgres container with
+  `appArmorProfile.type: Unconfined`. AppArmor signal mediation blocks
+  postgres's internal `kill()` calls under k3s, which makes it crash-loop;
+  unconfined lets it reach `initdb` and accept connections.
 
 To supply your own values for a local install:
 

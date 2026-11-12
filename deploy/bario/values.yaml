@@ -178,6 +178,12 @@ postgres:
     runAsUser: 70
     runAsGroup: 70
     fsGroup: 70
+  # Container-level security context. AppArmor signal mediation blocks
+  # postgres from killing its own processes under k3s; running the container
+  # unconfined lets it start. Pod-level uid/gid stay in securityContext above.
+  containerSecurityContext:
+    appArmorProfile:
+      type: Unconfined
   # Heavy service: on the Orange Pi cluster pin this to the master with the
   # other stateful/heavy workloads. Optional; empty keeps the scheduler defaults.
   nodeSelector: {}
