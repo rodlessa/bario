@@ -1,0 +1,151 @@
+<mxfile host="app.diagrams.net" agent="bario-architect" version="24.0.0" type="device">
+  <diagram id="bario-arch-001" name="System Architecture">
+    <mxGraphModel dx="1800" dy="1100" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1850" pageHeight="700" math="0" shadow="0" adaptiveColors="auto">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <mxCell id="title" value="Bario — System Architecture (detailed, master @ f7c6b0a + item 3e verified/uncommitted)" style="text;fontStyle=1;fontSize=16;html=1;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="40" y="10" width="900" height="30" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="browser" value="Browser&lt;br&gt;(end user)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F2F4F7;strokeColor=#B8C0CC;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="40" y="340" width="160" height="60" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="cluster" value="Kubernetes cluster — k3s v1.37.2 + Traefik, vm1@192.168.122.92" style="swimlane;startSize=24;fillColor=#F7F8FA;strokeColor=#D5DAE1;html=1;fontColor=#1B1F24;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="240" y="60" width="1560" height="580" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="ingress" value="Ingress (Traefik)&lt;br&gt;routes /api/*, / &amp;nbsp;—&amp;nbsp; never :9090/:9097" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="cluster">
+          <mxGeometry x="40" y="40" width="240" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="frontend" value="frontend&lt;br&gt;Vue3+TS SPA (nginx)&lt;br&gt;classic/modern toggle" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="cluster">
+          <mxGeometry x="340" y="40" width="220" height="60" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="svcgrp" value="Go services — each :8080 API + :9090/metrics (ads: :8087 / :9097), ClusterIP-only metrics" style="swimlane;startSize=24;fillColor=#FFFFFF;strokeColor=#D5DAE1;html=1;fontColor=#1B1F24;fontStyle=1;" vertex="1" parent="cluster">
+          <mxGeometry x="40" y="160" width="1480" height="170" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth" value="&lt;b&gt;auth&lt;/b&gt;&lt;br&gt;schema: auth&lt;br&gt;users(id,username,&lt;br&gt;password_hash,email,&lt;br&gt;is_admin,interests[])" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="svcgrp">
+          <mxGeometry x="40" y="40" width="240" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts" value="&lt;b&gt;posts&lt;/b&gt;&lt;br&gt;schema: posts&lt;br&gt;posts(id,user_id,content,&lt;br&gt;image_id,created_at)&lt;br&gt;&lt;font color=#2E7D32&gt;item 3e: interleaves ads&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="svcgrp">
+          <mxGeometry x="320" y="40" width="240" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="follows" value="&lt;b&gt;follows&lt;/b&gt;&lt;br&gt;schema: follows&lt;br&gt;follows(follower_id,&lt;br&gt;followee_id, PK both)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="svcgrp">
+          <mxGeometry x="600" y="40" width="240" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="uploads" value="&lt;b&gt;uploads&lt;/b&gt;&lt;br&gt;schema: uploads&lt;br&gt;images + moderation_audit&lt;br&gt;+ quarantine (fail-closed)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="svcgrp">
+          <mxGeometry x="880" y="40" width="240" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="ads" value="&lt;b&gt;ads&lt;/b&gt;&lt;br&gt;:8087 / :9097&lt;br&gt;schema: ads&lt;br&gt;advertisements/impressions/&lt;br&gt;clicks, scroll-scaled targeting" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="svcgrp">
+          <mxGeometry x="1160" y="40" width="240" height="90" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="modgrp" value="Moderation sidecars — ClusterIP-only, never via Ingress" style="swimlane;startSize=24;fillColor=#FFFFFF;strokeColor=#D5DAE1;html=1;fontColor=#1B1F24;fontStyle=1;" vertex="1" parent="cluster">
+          <mxGeometry x="40" y="370" width="560" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="modnsfw" value="moderation (NSFWJS)&lt;br&gt;POST /classify&lt;br&gt;:9095/metrics" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="modgrp">
+          <mxGeometry x="40" y="40" width="220" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="modgore" value="moderation-gore (CLIP)&lt;br&gt;POST /classify&lt;br&gt;zero-shot gore/violence" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="modgrp">
+          <mxGeometry x="300" y="40" width="220" height="70" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="postgres" value="PostgreSQL&lt;br&gt;StatefulSet + PVC&lt;br&gt;5 schemas, 1 instance" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#F3EEFF;strokeColor=#B9A6F0;fontColor=#1B1F24;" vertex="1" parent="cluster">
+          <mxGeometry x="660" y="380" width="160" height="100" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="prometheus" value="Prometheus&lt;br&gt;(ClusterIP)" style="image;aspect=fixed;html=1;align=center;fontSize=12;verticalLabelPosition=bottom;verticalAlign=top;image=https://app.diagrams.net/img/lib/azure2/other/Prometheus.svg;points=[[0.5,0,0],[0.499,1,0],[0,0.496,0],[1,0.504,0],[0.85,0.14,0],[0.862,0.847,0],[0.128,0.837,0],[0.148,0.143,0]];perimeter=ellipsePerimeter;fontColor=#1B1F24;" vertex="1" parent="cluster">
+          <mxGeometry x="880" y="385" width="64" height="64" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="legend" value="&lt;b&gt;Legend&lt;/b&gt;&lt;br&gt;solid = sync HTTP / DB call&lt;br&gt;&lt;font color=#5A626E&gt;gray dashed = metrics scrape&lt;/font&gt;&lt;br&gt;&lt;font color=#2E7D32&gt;green dashed = item 3e (fail-open)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;align=left;spacingLeft=8;fillColor=#FFF9DB;strokeColor=#E9D58A;fontColor=#1B1F24;" vertex="1" parent="cluster">
+          <mxGeometry x="1080" y="370" width="420" height="130" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e1" value="HTTPS" edge="1" parent="1" source="browser" target="ingress" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e2" value="/" edge="1" parent="cluster" source="ingress" target="frontend" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e3" value="/api/auth" edge="1" parent="cluster" source="ingress" target="auth" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e4" value="/api/posts" edge="1" parent="cluster" source="ingress" target="posts" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e5" value="/api/follows" edge="1" parent="cluster" source="ingress" target="follows" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e6" value="/api/uploads" edge="1" parent="cluster" source="ingress" target="uploads" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e7" value="/api/ads" edge="1" parent="cluster" source="ingress" target="ads" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e8" value="FollowingIDs" edge="1" parent="svcgrp" source="posts" target="follows" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e9" value="Username" edge="1" parent="svcgrp" source="posts" target="auth" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e10" value="Serve (fail-open)" edge="1" parent="svcgrp" source="posts" target="ads" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;strokeColor=#2E7D32;fontColor=#2E7D32;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e11" value="interests" edge="1" parent="svcgrp" source="ads" target="auth" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e12" value="/classify" edge="1" parent="cluster" source="uploads" target="modnsfw" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e13" value="/classify" edge="1" parent="cluster" source="uploads" target="modgore" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e14" value="auth" edge="1" parent="cluster" source="auth" target="postgres" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e15" value="posts" edge="1" parent="cluster" source="posts" target="postgres" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e16" value="follows" edge="1" parent="cluster" source="follows" target="postgres" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e17" value="uploads" edge="1" parent="cluster" source="uploads" target="postgres" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e18" value="ads" edge="1" parent="cluster" source="ads" target="postgres" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e19" value="scrape" edge="1" parent="cluster" source="prometheus" target="auth" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;strokeColor=#8A94A6;fontColor=#5A626E;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e20" value="scrape" edge="1" parent="cluster" source="prometheus" target="posts" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;strokeColor=#8A94A6;fontColor=#5A626E;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e21" value="scrape" edge="1" parent="cluster" source="prometheus" target="follows" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;strokeColor=#8A94A6;fontColor=#5A626E;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e22" value="scrape" edge="1" parent="cluster" source="prometheus" target="uploads" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;strokeColor=#8A94A6;fontColor=#5A626E;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e23" value="scrape" edge="1" parent="cluster" source="prometheus" target="ads" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;strokeColor=#8A94A6;fontColor=#5A626E;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e24" value="scrape" edge="1" parent="cluster" source="prometheus" target="modnsfw" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;strokeColor=#8A94A6;fontColor=#5A626E;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e25" value="scrape" edge="1" parent="cluster" source="prometheus" target="modgore" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;strokeColor=#8A94A6;fontColor=#5A626E;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
