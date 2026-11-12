@@ -53,6 +53,13 @@ spec:
                 name: {{ include "bario.serviceName" (dict "root" . "component" "ads") }}
                 port:
                   number: 8087
+          - path: /grafana
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "bario.serviceName" (dict "root" . "component" "grafana") }}
+                port:
+                  number: 3000
           - path: /
             pathType: Prefix
             backend:

@@ -1,60 +1,5 @@
 {{- $fullname := include "bario.fullname" . -}}
 {{- $name := printf "%s-prometheus" $fullname -}}
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: {{ $name }}
-  labels:
-    {{- include "bario.labels" . | nindent 4 }}
-    app.kubernetes.io/component: prometheus
-data:
-  prometheus.yml: |
-    global:
-      scrape_interval: {{ .Values.prometheus.scrapeInterval }}
-      evaluation_interval: {{ .Values.prometheus.scrapeInterval }}
-    scrape_configs:
-      - job_name: bario-auth
-        metrics_path: /metrics
-        scheme: http
-        static_configs:
-          - targets:
-              - "{{ include "bario.serviceName" (dict "root" . "component" "auth-metrics") }}:9090"
-      - job_name: bario-posts
-        metrics_path: /metrics
-        scheme: http
-        static_configs:
-          - targets:
-              - "{{ include "bario.serviceName" (dict "root" . "component" "posts-metrics") }}:9090"
-      - job_name: bario-uploads
-        metrics_path: /metrics
-        scheme: http
-        static_configs:
-          - targets:
-              - "{{ include "bario.serviceName" (dict "root" . "component" "uploads-metrics") }}:9090"
-      - job_name: bario-follows
-        metrics_path: /metrics
-        scheme: http
-        static_configs:
-          - targets:
-              - "{{ include "bario.serviceName" (dict "root" . "component" "follows-metrics") }}:9090"
-      - job_name: bario-ads
-        metrics_path: /metrics
-        scheme: http
-        static_configs:
-          - targets:
-              - "{{ include "bario.serviceName" (dict "root" . "component" "ads-metrics") }}:9097"
-      - job_name: bario-moderation
-        metrics_path: /metrics
-        scheme: http
-        static_configs:
-          - targets:
-              - "{{ include "bario.serviceName" (dict "root" . "component" "moderation-metrics") }}:9095"
-      - job_name: bario-moderation-gore
-        metrics_path: /metrics
-        scheme: http
-        static_configs:
-          - targets:
-              - "{{ include "bario.serviceName" (dict "root" . "component" "moderation-gore-metrics") }}:9096"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -74,6 +19,8 @@ spec:
       labels:
         {{- include "bario.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: prometheus
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/prometheus-config.yaml") . | sha256sum }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:

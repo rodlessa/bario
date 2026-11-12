@@ -235,3 +235,25 @@ prometheus:
     limits:
       cpu: 500m
       memory: 512Mi
+
+grafana:
+  replicas: 1
+  image:
+    repository: grafana/grafana
+    tag: "11.3.0"
+    pullPolicy: IfNotPresent
+  adminUser: admin
+  # Leave empty to let the chart generate a random password on first install.
+  # The generated value is stored in the Kubernetes Secret and reused on upgrade.
+  adminPassword: ""
+  # Optional scheduling constraints; empty keeps the scheduler defaults.
+  nodeSelector: {}
+  affinity: {}
+  tolerations: []
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi

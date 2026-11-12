@@ -1,0 +1,57 @@
+{{- $fullname := include "bario.fullname" . -}}
+{{- $name := printf "%s-grafana" $fullname -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $name }}-datasources
+  labels:
+    {{- include "bario.labels" . | nindent 4 }}
+    app.kubernetes.io/component: grafana
+data:
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        uid: bario-prometheus
+        type: prometheus
+        access: proxy
+        url: http://{{ include "bario.serviceName" (dict "root" . "component" "prometheus") }}:9090
+        isDefault: true
+        editable: false
+        jsonData:
+          timeInterval: {{ .Values.prometheus.scrapeInterval | quote }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $name }}-dashboard-provider
+  labels:
+    {{- include "bario.labels" . | nindent 4 }}
+    app.kubernetes.io/component: grafana
+data:
+  dashboards.yaml: |
+    apiVersion: 1
+    providers:
+      - name: bario
+        orgId: 1
+        folder: Bario
+        folderUid: bario
+        type: file
+        disableDeletion: true
+        updateIntervalSeconds: 30
+        allowUiUpdates: false
+        options:
+          path: /var/lib/grafana/dashboards
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $name }}-dashboards
+  labels:
+    {{- include "bario.labels" . | nindent 4 }}
+    app.kubernetes.io/component: grafana
+data:
+{{- range $path, $_ := .Files.Glob "dashboards/*.json" }}
+  {{ base $path | quote }}: |-
+{{ $.Files.Get $path | indent 4 }}
+{{- end }}
