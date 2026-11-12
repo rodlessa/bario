@@ -23,6 +23,17 @@ it at `MODERATION_URL` (default `http://localhost:8085`). See
 `backend/services/moderation/README.md` and
 `backend/services/uploads/README.md`.
 
+Local development ports:
+
+| Service | HTTP | Metrics |
+| ------- | ---- | ------- |
+| auth | 8081 | 9091 |
+| posts | 8082 | 9092 |
+| follows | 8083 | 9093 |
+| uploads | 8084 | 9094 |
+| moderation (NSFWJS) | 8085 | 9095 |
+| moderation-gore (CLIP) | 8086 | 9096 |
+
 ## Layout
 
 ```

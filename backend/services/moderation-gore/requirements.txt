@@ -1,0 +1,6 @@
+fastapi==0.162.5
+uvicorn==0.54.0
+python-multipart==0.0.33
+pillow==13.0.0
+prometheus-client==0.26.0
+transformers==5.22.2

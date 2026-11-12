@@ -1,0 +1,10 @@
+__pycache__
+*.pyc
+.venv
+.git
+.gitignore
+tests
+*.jpg
+*.jpeg
+*.png
+*.webp
