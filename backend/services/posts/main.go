@@ -37,6 +37,19 @@ const (
 
 var imageIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
 
+// postMigrations is shared with main_test.go so tests apply exactly the schema
+// run() uses.
+var postMigrations = []string{
+	`CREATE TABLE IF NOT EXISTS posts.posts (
+		id BIGSERIAL PRIMARY KEY,
+		user_id BIGINT NOT NULL,
+		content TEXT NOT NULL,
+		image_id TEXT,
+		created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+	)`,
+	`CREATE INDEX IF NOT EXISTS posts_user_id_id_idx ON posts.posts (user_id, id DESC)`,
+}
+
 type server struct {
 	db      *sql.DB
 	tokens  *jwt.Manager
@@ -81,16 +94,7 @@ func run() error {
 	}
 	defer pool.Close()
 
-	if err := db.Migrate(ctx, pool,
-		`CREATE TABLE IF NOT EXISTS posts.posts (
-			id BIGSERIAL PRIMARY KEY,
-			user_id BIGINT NOT NULL,
-			content TEXT NOT NULL,
-			image_id TEXT,
-			created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-		)`,
-		`CREATE INDEX IF NOT EXISTS posts_user_id_id_idx ON posts.posts (user_id, id DESC)`,
-	); err != nil {
+	if err := db.Migrate(ctx, pool, postMigrations...); err != nil {
 		return err
 	}
 
