@@ -19,6 +19,18 @@ import (
 
 const schema = "follows"
 
+// followsMigrations is shared with main_test.go so tests apply exactly the
+// schema run() uses.
+var followsMigrations = []string{
+	`CREATE TABLE IF NOT EXISTS follows.follows (
+		follower_id BIGINT NOT NULL,
+		followee_id BIGINT NOT NULL,
+		created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+		PRIMARY KEY (follower_id, followee_id)
+	)`,
+	`CREATE INDEX IF NOT EXISTS follows_followee_id_idx ON follows.follows (followee_id)`,
+}
+
 type server struct {
 	db     *sql.DB
 	tokens *jwt.Manager
@@ -48,15 +60,7 @@ func run() error {
 	}
 	defer pool.Close()
 
-	if err := db.Migrate(ctx, pool,
-		`CREATE TABLE IF NOT EXISTS follows.follows (
-			follower_id BIGINT NOT NULL,
-			followee_id BIGINT NOT NULL,
-			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-			PRIMARY KEY (follower_id, followee_id)
-		)`,
-		`CREATE INDEX IF NOT EXISTS follows_followee_id_idx ON follows.follows (followee_id)`,
-	); err != nil {
+	if err := db.Migrate(ctx, pool, followsMigrations...); err != nil {
 		return err
 	}
 
