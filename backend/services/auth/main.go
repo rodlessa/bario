@@ -27,8 +27,9 @@ const schema = "auth"
 var usernamePattern = regexp.MustCompile(`^[A-Za-z0-9_]{3,32}$`)
 
 type server struct {
-	db     *sql.DB
-	tokens *jwt.Manager
+	db            *sql.DB
+	tokens        *jwt.Manager
+	adminUsername string
 }
 
 func main() {
@@ -55,8 +56,10 @@ func run() error {
 			username TEXT NOT NULL UNIQUE,
 			password_hash TEXT NOT NULL,
 			email TEXT NOT NULL,
+			is_admin BOOLEAN NOT NULL DEFAULT false,
 			created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 		)`,
+		`ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT false`,
 	); err != nil {
 		return err
 	}
@@ -66,7 +69,7 @@ func run() error {
 		return err
 	}
 
-	srv := &server{db: pool, tokens: tokens}
+	srv := &server{db: pool, tokens: tokens, adminUsername: env("ADMIN_USERNAME", "admin")}
 	m := metrics.New("auth")
 	router := bariohttp.NewRouter(m)
 	srv.registerRoutes(router)
@@ -118,10 +121,12 @@ func (s *server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	isAdmin := username == s.adminUsername
+
 	var id int64
 	err = s.db.QueryRowContext(r.Context(),
-		`INSERT INTO auth.users (username, password_hash, email) VALUES ($1, $2, $3) RETURNING id`,
-		username, string(hash), email,
+		`INSERT INTO auth.users (username, password_hash, email, is_admin) VALUES ($1, $2, $3, $4) RETURNING id`,
+		username, string(hash), email, isAdmin,
 	).Scan(&id)
 	if err != nil {
 		if db.IsUniqueViolation(err) {
@@ -133,7 +138,11 @@ func (s *server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	bariohttp.WriteJSON(w, http.StatusCreated, map[string]any{"id": id, "username": username})
+	bariohttp.WriteJSON(w, http.StatusCreated, map[string]any{
+		"id":       id,
+		"username": username,
+		"is_admin": isAdmin,
+	})
 }
 
 type loginRequest struct {
@@ -152,10 +161,11 @@ func (s *server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		id       int64
 		hash     string
 		storedAs string
+		isAdmin  bool
 	)
 	err := s.db.QueryRowContext(r.Context(),
-		`SELECT id, username, password_hash FROM auth.users WHERE username = $1`, username,
-	).Scan(&id, &storedAs, &hash)
+		`SELECT id, username, password_hash, is_admin FROM auth.users WHERE username = $1`, username,
+	).Scan(&id, &storedAs, &hash, &isAdmin)
 	if errors.Is(err, sql.ErrNoRows) {
 		bariohttp.WriteError(w, http.StatusUnauthorized, "invalid username or password")
 		return
@@ -180,7 +190,7 @@ func (s *server) handleLogin(w http.ResponseWriter, r *http.Request) {
 
 	bariohttp.WriteJSON(w, http.StatusOK, map[string]any{
 		"token": token,
-		"user":  map[string]any{"id": id, "username": storedAs},
+		"user":  map[string]any{"id": id, "username": storedAs, "is_admin": isAdmin},
 	})
 }
 
@@ -192,11 +202,12 @@ func (s *server) handleGetUser(w http.ResponseWriter, r *http.Request) {
 
 	var (
 		username  string
+		isAdmin   bool
 		createdAt time.Time
 	)
 	err := s.db.QueryRowContext(r.Context(),
-		`SELECT username, created_at FROM auth.users WHERE id = $1`, id,
-	).Scan(&username, &createdAt)
+		`SELECT username, is_admin, created_at FROM auth.users WHERE id = $1`, id,
+	).Scan(&username, &isAdmin, &createdAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		bariohttp.WriteError(w, http.StatusNotFound, "user not found")
 		return
@@ -210,6 +221,7 @@ func (s *server) handleGetUser(w http.ResponseWriter, r *http.Request) {
 	bariohttp.WriteJSON(w, http.StatusOK, map[string]any{
 		"id":         id,
 		"username":   username,
+		"is_admin":   isAdmin,
 		"created_at": createdAt,
 	})
 }
