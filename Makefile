@@ -6,8 +6,8 @@ NAMESPACE ?= bario
 RELEASE ?= bario
 HELM ?= helm
 CHART := deploy/bario
-SERVICES := auth posts uploads follows
-GO_PACKAGES := ./pkg/... ./services/auth/... ./services/posts/... ./services/uploads/... ./services/follows/...
+SERVICES := auth posts uploads follows ads
+GO_PACKAGES := ./pkg/... ./services/auth/... ./services/posts/... ./services/uploads/... ./services/follows/... ./services/ads/...
 IMAGE_SETS = \
 	--set services.auth.image.repository=$(REGISTRY)/auth \
 	--set services.auth.image.tag=$(TAG) \
@@ -67,5 +67,5 @@ helm-lint:
 	$(HELM) lint $(CHART)
 
 clean:
-	rm -f backend/services/*/auth backend/services/*/posts backend/services/*/uploads backend/services/*/follows
+	rm -f backend/services/*/auth backend/services/*/posts backend/services/*/uploads backend/services/*/follows backend/services/*/ads
 	rm -rf frontend/dist

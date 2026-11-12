@@ -39,6 +39,11 @@ func (r *Router) Post(path, endpoint string, handler http.HandlerFunc) {
 	r.Handle(http.MethodPost, path, endpoint, handler)
 }
 
+// Patch registers a PATCH route.
+func (r *Router) Patch(path, endpoint string, handler http.HandlerFunc) {
+	r.Handle(http.MethodPatch, path, endpoint, handler)
+}
+
 // Delete registers a DELETE route.
 func (r *Router) Delete(path, endpoint string, handler http.HandlerFunc) {
 	r.Handle(http.MethodDelete, path, endpoint, handler)

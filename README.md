@@ -1,7 +1,7 @@
 # Bario
 
 Bario is a small Twitter-like social network: short posts, image attachments,
-follow/unfollow, and a home feed. It is built as four Go services behind a Vue 3
+follow/unfollow, and a home feed. It is built as five Go services behind a Vue 3
 SPA, deployed to local Kubernetes with a Helm chart. Every service exposes
 Prometheus metrics on a private, cluster-only port.
 
@@ -9,7 +9,7 @@ Prometheus metrics on a private, cluster-only port.
 
 | Layer    | Tech                                                     |
 | -------- | -------------------------------------------------------- |
-| Backend  | Go (4 services: auth, posts, uploads, follows)           |
+| Backend  | Go (5 services: auth, posts, uploads, follows, ads)      |
 | Moderation | NSFWJS + CLIP gore sidecars (screen uploads)             |
 | Frontend | Vue 3 + TypeScript + Vite, served by nginx               |
 | Database | PostgreSQL 16, one schema per service                    |
@@ -34,6 +34,7 @@ Local development ports:
 | uploads | 8084 | 9094 |
 | moderation (NSFWJS) | 8085 | 9095 |
 | moderation-gore (CLIP) | 8086 | 9096 |
+| ads | 8087 | 9097 |
 
 ## Layout
 
@@ -50,6 +51,7 @@ bario/
 │       ├── posts/
 │       ├── uploads/
 │       ├── follows/
+│       ├── ads/              # campaign create/list scaffold
 │       ├── moderation/       # Node + NSFWJS sidecar (uploads moderation)
 │       └── moderation-gore/  # Python + CLIP gore sidecar
 ├── frontend/                 # Vue 3 + TS + Vite + nginx
@@ -159,7 +161,7 @@ export DATABASE_URL="postgres://bario:${POSTGRES_PASSWORD}@localhost:5432/bario?
 export JWT_SECRET="$(openssl rand -hex 32)"
 ```
 
-Run the four services on separate ports (the frontend dev proxy expects these):
+Run the Go services on separate ports:
 
 ```bash
 cd backend
@@ -171,6 +173,7 @@ cd backend
   AUTH_URL=http://localhost:8081 FOLLOWS_URL=http://localhost:8083 go run .) &
 (cd services/uploads && HTTP_PORT=8084 METRICS_PORT=9094 \
   UPLOAD_DIR=/tmp/bario-uploads go run .) &
+(cd services/ads && HTTP_PORT=8087 METRICS_PORT=9097 go run .) &
 ```
 
 The optional moderation sidecars are separate services: NSFWJS on `:8085`

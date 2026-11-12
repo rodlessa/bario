@@ -6,6 +6,7 @@ backend/services/*/auth
 backend/services/*/posts
 backend/services/*/uploads
 backend/services/*/follows
+backend/services/*/ads
 
 # Node / Vue
 frontend/node_modules/
