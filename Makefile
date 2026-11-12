@@ -20,7 +20,7 @@ IMAGE_SETS = \
 	--set frontend.image.repository=$(REGISTRY)/frontend \
 	--set frontend.image.tag=$(TAG)
 
-.PHONY: all build backend frontend test docker-build docker-build-backend docker-build-frontend helm-install helm-upgrade helm-template helm-lint clean
+.PHONY: all build backend frontend test guard docker-build docker-build-backend docker-build-frontend helm-install helm-upgrade helm-template helm-lint clean
 
 all: build
 
@@ -37,6 +37,10 @@ frontend:
 test:
 	cd backend && go vet $(GO_PACKAGES)
 	cd frontend && npm run typecheck
+
+## Deterministic, offline secret scan of staged changes.
+guard:
+	sh scripts/secret_scan.sh --staged
 
 ## Build all container images tagged $(REGISTRY)/<name>:$(TAG).
 docker-build: docker-build-backend docker-build-frontend

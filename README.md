@@ -181,11 +181,11 @@ Example:
 ```bash
 curl -s -X POST http://bario.local/api/auth/register \
   -H 'Content-Type: application/json' \
-  -d '{"username":"ada","password":"correct-horse-battery","email":"ada@example.com"}'
+  -d '{"username":"ada","password":"<password>","email":"ada@example.com"}'
 
 TOKEN=$(curl -s -X POST http://bario.local/api/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"username":"ada","password":"correct-horse-battery"}' | jq -r .token)
+  -d '{"username":"ada","password":"<password>"}' | jq -r .token)
 
 curl -s -X POST http://bario.local/api/posts \
   -H "Authorization: Bearer $TOKEN" \
@@ -242,6 +242,7 @@ upload and preview).
 | ---------------- | ------------------------------------------------------------- |
 | `make build`     | Build all Go services and the frontend production bundle      |
 | `make test`      | `go vet` plus Vue/TypeScript type checking                    |
+| `make guard`     | Deterministic secret scan of staged changes                   |
 | `make docker-build` | Build the four service images and the frontend image       |
 | `make helm-install` | `helm upgrade --install` into `NAMESPACE` (`bario`)        |
 | `make helm-upgrade` | `helm upgrade` an existing release                         |
@@ -259,3 +260,26 @@ Override variables: `REGISTRY`, `TAG`, `NAMESPACE`, `RELEASE`, `HELM`.
   someone before expecting the home feed to fill up; a profile shows its own
   posts regardless.
 - Passwords are bcrypt hashes; JWTs are HS256 with a 24-hour lifetime.
+
+## Security
+
+Secret scanning is deterministic and fully local: no LLM, no network. The
+scanner reports `path:line [rule]` and never prints the secret value itself.
+
+- `make guard` (or `sh scripts/secret_scan.sh --staged`) scans the staged
+  changes and exits non-zero when it finds provider API keys, PEM/OpenSSH
+  private keys, non-empty `.env` values, credential-style assignments, or long
+  high-entropy tokens in assignment or bearer contexts.
+- Pass file paths to scan files in full instead:
+  `sh scripts/secret_scan.sh path/to/file`.
+- Install the pre-commit hook if you want every commit checked:
+
+  ```bash
+  cp scripts/pre-commit .git/hooks/pre-commit
+  chmod +x .git/hooks/pre-commit
+  ```
+
+- Mark a deliberate fixture with a `secret-scan:allow` comment on that line.
+  If a finding is ambiguous, escalate the flagged lines to Nano
+  (`maestri ask "Nano" "<flagged lines>"`) before deciding. Remove and rotate
+  real credentials; never commit them.

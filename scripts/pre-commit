@@ -1,0 +1,23 @@
+#!/bin/sh
+# Bario pre-commit hook: block commits that introduce secrets.
+#
+# Install from the repository root:
+#   cp scripts/pre-commit .git/hooks/pre-commit
+#   chmod +x .git/hooks/pre-commit
+#
+# The scan is deterministic and offline: no network, no LLM.
+
+set -eu
+
+root=$(git rev-parse --show-toplevel 2>/dev/null) || {
+    echo "pre-commit: not inside a git work tree" >&2
+    exit 1
+}
+
+scanner="$root/scripts/secret_scan.sh"
+if [ ! -f "$scanner" ]; then
+    echo "pre-commit: missing scanner at scripts/secret_scan.sh" >&2
+    exit 1
+fi
+
+exec sh "$scanner" --staged
