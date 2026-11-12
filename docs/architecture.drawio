@@ -148,4 +148,248 @@
       </root>
     </mxGraphModel>
   </diagram>
+  <diagram id="bario-posts-001" name="posts service">
+    <mxGraphModel dx="1900" dy="1100" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1900" pageHeight="1100" math="0" shadow="0" adaptiveColors="auto">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <mxCell id="posts-title" value="Bario — posts service (schema posts, master @ ad4f3c4)" style="text;fontStyle=1;fontSize=16;html=1;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="40" y="10" width="1000" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-subtitle" value="Internal handler flow · outbound clients · owned tables · failure/degradation behavior" style="text;fontSize=12;html=1;fontColor=#5A626E;" vertex="1" parent="1">
+          <mxGeometry x="40" y="40" width="1000" height="24" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="posts-client" value="Browser / Traefik ingress&lt;br&gt;&lt;font color=#5A626E&gt;/api/posts/* · /feed&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="40" y="120" width="160" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-prometheus" value="Prometheus&lt;br&gt;&lt;font color=#5A626E&gt;scrape /metrics :9090&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F2F4F7;strokeColor=#B8C0CC;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="40" y="230" width="160" height="70" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="posts-svc" value="posts Deployment — Go · schema posts · API :8080 · metrics :9090" style="swimlane;startSize=26;fillColor=#F7F8FA;strokeColor=#D5DAE1;html=1;fontColor=#1B1F24;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="240" y="90" width="1180" height="700" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-startup" value="startup: db.Connect → db.Migrate (posts schema + index) → jwt.NewManager → registerRoutes → Serve :8080 / :9090" style="text;html=1;align=left;fontSize=11;fontColor=#5A626E;" vertex="1" parent="posts-svc">
+          <mxGeometry x="20" y="28" width="1120" height="18" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="posts-lane-create" value="POST /posts — handleCreatePost — authenticated write" style="swimlane;startSize=22;fillColor=#FFFFFF;strokeColor=#D5DAE1;html=1;fontColor=#1B1F24;fontStyle=1;" vertex="1" parent="posts-svc">
+          <mxGeometry x="20" y="50" width="1140" height="110" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-c1" value="POST /posts&lt;br&gt;/api/posts&lt;br&gt;/api/posts/posts&lt;br&gt;&lt;font color=#5A626E&gt;RequireAuth JWT&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="posts-lane-create">
+          <mxGeometry x="20" y="30" width="170" height="64" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-c2" value="handleCreatePost&lt;br&gt;&lt;font color=#5A626E&gt;JSON decode&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="posts-lane-create">
+          <mxGeometry x="230" y="30" width="170" height="64" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-c3" value="validate&lt;br&gt;content 1–280 chars&lt;br&gt;image_id ^[A-Za-z0-9_-]{1,64}$&lt;br&gt;&lt;font color=#B42318&gt;400 on failure&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="posts-lane-create">
+          <mxGeometry x="440" y="30" width="230" height="64" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-c4" value="INSERT posts.posts&lt;br&gt;RETURNING id, created_at&lt;br&gt;&lt;font color=#B42318&gt;500 on DB error&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="posts-lane-create">
+          <mxGeometry x="710" y="30" width="250" height="64" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-c5" value="201 post JSON&lt;br&gt;&lt;font color=#5A626E&gt;author from JWT claims&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="posts-lane-create">
+          <mxGeometry x="1000" y="30" width="120" height="64" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="posts-lane-feed" value="GET /feed — handleFeed — ads-interleaved home feed (most failure-prone path)" style="swimlane;startSize=22;fillColor=#FFFFFF;strokeColor=#D5DAE1;html=1;fontColor=#1B1F24;fontStyle=1;" vertex="1" parent="posts-svc">
+          <mxGeometry x="20" y="160" width="1140" height="300" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-f1" value="GET /feed&lt;br&gt;/api/posts/feed&lt;br&gt;&lt;font color=#5A626E&gt;RequireAuth JWT&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="posts-lane-feed">
+          <mxGeometry x="20" y="30" width="160" height="84" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-f2" value="parsePagination&lt;br&gt;limit 1..100 (default 20)&lt;br&gt;cursor id (0 = first page)&lt;br&gt;&lt;font color=#B42318&gt;400 invalid&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="posts-lane-feed">
+          <mxGeometry x="210" y="30" width="190" height="84" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-f3" value="parsePages&lt;br&gt;pages ≥ 0 (default 0)&lt;br&gt;scales ad density&lt;br&gt;&lt;font color=#B42318&gt;400 invalid&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="posts-lane-feed">
+          <mxGeometry x="430" y="30" width="160" height="84" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-f4" value="followsClient.FollowingIDs&lt;br&gt;GET /users/{id}/following&lt;br&gt;&lt;font color=#B42318&gt;load-bearing: error → 502&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="posts-lane-feed">
+          <mxGeometry x="620" y="30" width="200" height="84" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-f6" value="200&lt;br&gt;{items: [],&lt;br&gt;next_cursor: null}&lt;br&gt;&lt;font color=#5A626E&gt;no ads fetched&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="posts-lane-feed">
+          <mxGeometry x="850" y="30" width="180" height="84" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="posts-g1" value="SELECT posts.posts&lt;br&gt;WHERE user_id = ANY(followed)&lt;br&gt;AND (cursor = 0 OR id &lt; cursor)&lt;br&gt;ORDER BY id DESC LIMIT&lt;br&gt;&lt;font color=#B42318&gt;error/scan → 500&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="posts-lane-feed">
+          <mxGeometry x="20" y="150" width="220" height="84" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-g2" value="attachAuthors&lt;br&gt;authClient.Username per unique user&lt;br&gt;&lt;font color=#2E7D32&gt;auth down → user-&amp;lt;id&amp;gt;&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="posts-lane-feed">
+          <mxGeometry x="270" y="150" width="180" height="84" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-g3" value="adsClient.Serve&lt;br&gt;GET /ads/serve?pages&amp;amp;limit&lt;br&gt;forwards caller Authorization&lt;br&gt;&lt;font color=#2E7D32&gt;error/timeout (3s) → ads=nil&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="posts-lane-feed">
+          <mxGeometry x="480" y="150" width="210" height="84" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-g4" value="interleaveFeed&lt;br&gt;ad position =&lt;br&gt;floor((i+1) × P / (A+1))&lt;br&gt;&lt;font color=#5A626E&gt;spread between organic posts&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="posts-lane-feed">
+          <mxGeometry x="720" y="150" width="200" height="84" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-g5" value="200 feedList&lt;br&gt;{items, next_cursor}&lt;br&gt;cursor = last ORGANIC post id&lt;br&gt;&lt;font color=#5A626E&gt;ads re-rolled each request&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="posts-lane-feed">
+          <mxGeometry x="950" y="150" width="170" height="84" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="posts-lane-get" value="GET /posts/{id} — handleGetPost — public read" style="swimlane;startSize=22;fillColor=#FFFFFF;strokeColor=#D5DAE1;html=1;fontColor=#1B1F24;fontStyle=1;" vertex="1" parent="posts-svc">
+          <mxGeometry x="20" y="460" width="1140" height="110" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-p1" value="GET /posts/{id}&lt;br&gt;/api/posts/{id}&lt;br&gt;/api/posts/posts/{id}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="posts-lane-get">
+          <mxGeometry x="20" y="30" width="200" height="64" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-p2" value="parseID&lt;br&gt;&lt;font color=#B42318&gt;400 invalid&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="posts-lane-get">
+          <mxGeometry x="250" y="30" width="140" height="64" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-p3" value="SELECT posts.posts WHERE id=$1&lt;br&gt;&lt;font color=#B42318&gt;404 no rows · 500 DB error&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="posts-lane-get">
+          <mxGeometry x="420" y="30" width="280" height="64" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-p4" value="attachAuthors" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="posts-lane-get">
+          <mxGeometry x="730" y="30" width="160" height="64" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-p5" value="200 post JSON" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="posts-lane-get">
+          <mxGeometry x="920" y="30" width="180" height="64" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="posts-lane-list" value="GET /users/{id}/posts — handleListUserPosts — public profile timeline" style="swimlane;startSize=22;fillColor=#FFFFFF;strokeColor=#D5DAE1;html=1;fontColor=#1B1F24;fontStyle=1;" vertex="1" parent="posts-svc">
+          <mxGeometry x="20" y="570" width="1140" height="110" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-l1" value="GET /users/{id}/posts&lt;br&gt;/api/posts/users/{id}/posts" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="posts-lane-list">
+          <mxGeometry x="20" y="30" width="230" height="64" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-l2" value="parsePagination" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="posts-lane-list">
+          <mxGeometry x="280" y="30" width="160" height="64" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-l3" value="SELECT posts.posts WHERE user_id=$1&lt;br&gt;ORDER BY id DESC LIMIT&lt;br&gt;&lt;font color=#B42318&gt;500 DB error&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="posts-lane-list">
+          <mxGeometry x="470" y="30" width="300" height="64" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-l4" value="attachAuthors" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="posts-lane-list">
+          <mxGeometry x="800" y="30" width="150" height="64" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-l5" value="200 postList&lt;br&gt;{posts, next_cursor}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="posts-lane-list">
+          <mxGeometry x="980" y="30" width="140" height="64" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="posts-deps" value="Outbound HTTP dependencies (clients owned by posts)" style="swimlane;startSize=24;fillColor=#F7F8FA;strokeColor=#D5DAE1;html=1;fontColor=#1B1F24;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1460" y="90" width="420" height="400" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-follows" value="&lt;b&gt;follows service&lt;/b&gt; · :8080&lt;br&gt;GET /users/{id}/following&lt;br&gt;&lt;font color=#B42318&gt;LOAD-BEARING: error → 502&lt;/font&gt;&lt;br&gt;&lt;font color=#5A626E&gt;feed cannot be built without it&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="posts-deps">
+          <mxGeometry x="20" y="40" width="380" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-auth" value="&lt;b&gt;auth service&lt;/b&gt; · :8080&lt;br&gt;GET /users/{id}&lt;br&gt;&lt;font color=#2E7D32&gt;best-effort: error → user-&amp;lt;id&amp;gt;&lt;/font&gt;&lt;br&gt;&lt;font color=#5A626E&gt;author names only; feed still 200&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="posts-deps">
+          <mxGeometry x="20" y="160" width="380" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-ads" value="&lt;b&gt;ads service&lt;/b&gt; · :8087&lt;br&gt;GET /ads/serve?pages&amp;amp;limit&lt;br&gt;forwards caller Authorization&lt;br&gt;&lt;font color=#2E7D32&gt;fail-open: error/timeout → no ads (200)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="posts-deps">
+          <mxGeometry x="20" y="270" width="380" height="100" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="posts-store" value="PostgreSQL — schema posts" style="swimlane;startSize=24;fillColor=#F7F8FA;strokeColor=#D5DAE1;html=1;fontColor=#1B1F24;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1460" y="510" width="420" height="300" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-pg" value="PostgreSQL 16 · single instance&lt;br&gt;&lt;font color=#5A626E&gt;pod uid/gid 70 · AppArmor Unconfined&lt;/font&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#F3EEFF;strokeColor=#B9A6F0;fontColor=#1B1F24;" vertex="1" parent="posts-store">
+          <mxGeometry x="20" y="40" width="380" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-table" value="&lt;b&gt;posts.posts&lt;/b&gt;&lt;br&gt;&lt;font face=monospace&gt;id BIGSERIAL PK&lt;br&gt;user_id BIGINT NOT NULL&lt;br&gt;content TEXT NOT NULL&lt;br&gt;image_id TEXT NULL&lt;br&gt;created_at TIMESTAMPTZ NOT NULL DEFAULT now()&lt;/font&gt;&lt;br&gt;index posts_user_id_id_idx (user_id, id DESC)" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#FCFBFF;strokeColor=#B9A6F0;fontColor=#1B1F24;" vertex="1" parent="posts-store">
+          <mxGeometry x="20" y="125" width="380" height="155" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="posts-failures" value="&lt;b&gt;Failure / degradation matrix&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;font color=#B42318&gt;&lt;b&gt;follows down&lt;/b&gt;&lt;/font&gt; → 502 could not load the accounts you follow · feed aborts (load-bearing)&lt;br&gt;&lt;font color=#B42318&gt;&lt;b&gt;posts DB error/scan&lt;/b&gt;&lt;/font&gt; → 500 · feed: could not load feed · get: could not load post · list: could not load posts · create: could not create post&lt;br&gt;&lt;font color=#2E7D32&gt;&lt;b&gt;ads error / timeout (3s)&lt;/b&gt;&lt;/font&gt; → warn log, ads=nil, 200 organic-only feed (fail-open, never 502)&lt;br&gt;&lt;font color=#2E7D32&gt;&lt;b&gt;auth username lookup down&lt;/b&gt;&lt;/font&gt; → author.username = user-&amp;lt;id&amp;gt; · feed still 200&lt;br&gt;&lt;font color=#B42318&gt;&lt;b&gt;bad input&lt;/b&gt;&lt;/font&gt; → 400 · content empty/&amp;gt;280 · image_id regex · limit/cursor/pages · id&lt;br&gt;&lt;font color=#5A626E&gt;&lt;b&gt;empty follows&lt;/b&gt;&lt;/font&gt; → 200 {items: [], next_cursor: null} · ads are not fetched" style="rounded=1;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=10;spacingTop=6;fillColor=#FFFFFF;strokeColor=#D5DAE1;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="40" y="810" width="900" height="250" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="posts-contract" value="&lt;b&gt;Feed response contract&lt;/b&gt;&lt;br&gt;&lt;font face=monospace&gt;GET /feed 200&lt;br&gt;{&lt;br&gt;&amp;nbsp;&amp;nbsp;items: [&lt;br&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;{kind: 'post', id, user_id, content,&lt;br&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp; image_id, created_at, author},&lt;br&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;{kind: 'ad', id, advertiser_id, title, body}&lt;br&gt;&amp;nbsp;&amp;nbsp;],&lt;br&gt;&amp;nbsp;&amp;nbsp;next_cursor: '&amp;lt;last organic post id&amp;gt;' | null&lt;br&gt;}&lt;/font&gt;&lt;br&gt;&lt;br&gt;Ads are re-rolled every request and never participate in cursor pagination.&lt;br&gt;List-user-posts still returns the postList envelope {posts, next_cursor}." style="rounded=1;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=10;spacingTop=6;fillColor=#FFFFFF;strokeColor=#D5DAE1;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="960" y="810" width="460" height="250" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="posts-legend" value="&lt;b&gt;Legend&lt;/b&gt;&lt;br&gt;solid blue = sync HTTP / DB call&lt;br&gt;&lt;font color=#B42318&gt;red dashed = load-bearing failure (abort)&lt;/font&gt;&lt;br&gt;&lt;font color=#2E7D32&gt;green dashed = graceful degradation / fail-open&lt;/font&gt;&lt;br&gt;&lt;font color=#5A626E&gt;gray dashed = metrics scrape&lt;/font&gt;&lt;br&gt;purple = PostgreSQL storage&lt;br&gt;&lt;br&gt;&lt;b&gt;Runtime&lt;/b&gt;&lt;br&gt;HTTP :8080 · metrics :9090 (ClusterIP only)&lt;br&gt;env: DATABASE_URL, JWT_SECRET, AUTH_URL,&lt;br&gt;FOLLOWS_URL, ADS_URL, HTTP_PORT, METRICS_PORT" style="rounded=1;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=10;spacingTop=6;fillColor=#FFF9DB;strokeColor=#E9D58A;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="1440" y="810" width="420" height="250" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="posts-e-client" value="/api/posts &amp;amp; /feed" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="1" source="posts-client" target="posts-svc">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-e-prom" value="scrape :9090/metrics" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;strokeColor=#8A94A6;fontColor=#5A626E;" edge="1" parent="1" source="posts-prometheus" target="posts-svc">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="posts-e-c1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="posts-lane-create" source="posts-c1" target="posts-c2">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-e-c2" value="JSON" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="posts-lane-create" source="posts-c2" target="posts-c3">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-e-c3" value="valid" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="posts-lane-create" source="posts-c3" target="posts-c4">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-e-c4" value="created" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="posts-lane-create" source="posts-c4" target="posts-c5">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="posts-e-f1" value="authenticated" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="posts-lane-feed" source="posts-f1" target="posts-f2">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-e-f2" value="limit, cursor" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="posts-lane-feed" source="posts-f2" target="posts-f3">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-e-f3" value="pages" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="posts-lane-feed" source="posts-f3" target="posts-f4">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-e-fnone" value="len(follows)==0" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontColor=#5A626E;" edge="1" parent="posts-lane-feed" source="posts-f4" target="posts-f6">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-e-fyes" value="has follows" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="posts-lane-feed" source="posts-f4" target="posts-g1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-e-g1" value="organic posts" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="posts-lane-feed" source="posts-g1" target="posts-g2">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-e-g2" value="authors" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="posts-lane-feed" source="posts-g2" target="posts-g3">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-e-g3" value="ads or nil" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontColor=#2E7D32;" edge="1" parent="posts-lane-feed" source="posts-g3" target="posts-g4">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-e-g4" value="interleaved items" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="posts-lane-feed" source="posts-g4" target="posts-g5">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="posts-e-p1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="posts-lane-get" source="posts-p1" target="posts-p2">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-e-p2" value="id" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="posts-lane-get" source="posts-p2" target="posts-p3">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-e-p3" value="post" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="posts-lane-get" source="posts-p3" target="posts-p4">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-e-p4" value="author" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="posts-lane-get" source="posts-p4" target="posts-p5">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="posts-e-l1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="posts-lane-list" source="posts-l1" target="posts-l2">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-e-l2" value="limit, cursor" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="posts-lane-list" source="posts-l2" target="posts-l3">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-e-l3" value="posts" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="posts-lane-list" source="posts-l3" target="posts-l4">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-e-l4" value="authors" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="posts-lane-list" source="posts-l4" target="posts-l5">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="posts-e-follows" value="FollowingIDs · load-bearing (error → 502)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontColor=#B42318;" edge="1" parent="1" source="posts-f4" target="posts-follows">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-e-auth" value="Username · best-effort" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontColor=#2E7D32;" edge="1" parent="1" source="posts-g2" target="posts-auth">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-e-ads" value="Serve · fail-open" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;strokeColor=#2E7D32;fontColor=#2E7D32;" edge="1" parent="1" source="posts-g3" target="posts-ads">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="posts-e-db" value="SELECT / INSERT posts.posts (all handlers)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#B9A6F0;fontColor=#6B51A8;" edge="1" parent="1" source="posts-svc" target="posts-pg">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
 </mxfile>
