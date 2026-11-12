@@ -267,7 +267,7 @@ services mount the same handlers under both the bare path and that prefix.
 | posts   | `POST /posts`                            | yes  | `{content, image_id?}` → `201`           |
 | posts   | `GET /posts/{id}`                        | no   | Post plus author                         |
 | posts   | `GET /users/{id}/posts?cursor=&limit=`   | no   | A user's posts, newest first             |
-| posts   | `GET /feed?cursor=&limit=`               | yes  | Posts from followed accounts             |
+| posts   | `GET /feed?cursor=&limit=&pages=`        | yes  | Posts from followed accounts plus ads   |
 | uploads | `POST /uploads`                          | yes  | `multipart/form-data`, field `file`      |
 | uploads | `GET /uploads/{id}`                      | no   | Image bytes with the stored content type |
 | follows | `POST /users/{id}/follow`                | yes  | Follow a user                            |

@@ -55,6 +55,7 @@ type server struct {
 	tokens  *jwt.Manager
 	auth    *authclient.Client
 	follows *followsClient
+	ads     *adsClient
 }
 
 type author struct {
@@ -73,6 +74,21 @@ type post struct {
 
 type postList struct {
 	Posts      []post  `json:"posts"`
+	NextCursor *string `json:"next_cursor"`
+}
+
+type feedPostItem struct {
+	Kind string `json:"kind"`
+	post
+}
+
+type feedAdItem struct {
+	Kind string `json:"kind"`
+	servedAd
+}
+
+type feedList struct {
+	Items      []any   `json:"items"`
 	NextCursor *string `json:"next_cursor"`
 }
 
@@ -108,6 +124,7 @@ func run() error {
 		tokens:  tokens,
 		auth:    authclient.New(env("AUTH_URL", "http://localhost:8081")),
 		follows: newFollowsClient(env("FOLLOWS_URL", "http://localhost:8083")),
+		ads:     newAdsClient(env("ADS_URL", "http://localhost:8087")),
 	}
 
 	m := metrics.New("posts")
@@ -257,6 +274,10 @@ func (s *server) handleFeed(w http.ResponseWriter, r *http.Request, claims *jwt.
 	if !ok {
 		return
 	}
+	pages, ok := parsePages(w, r)
+	if !ok {
+		return
+	}
 
 	followedIDs, err := s.follows.FollowingIDs(r.Context(), claims.UserID)
 	if err != nil {
@@ -265,7 +286,7 @@ func (s *server) handleFeed(w http.ResponseWriter, r *http.Request, claims *jwt.
 		return
 	}
 	if len(followedIDs) == 0 {
-		bariohttp.WriteJSON(w, http.StatusOK, postList{Posts: []post{}, NextCursor: nil})
+		bariohttp.WriteJSON(w, http.StatusOK, feedList{Items: []any{}, NextCursor: nil})
 		return
 	}
 
@@ -292,7 +313,52 @@ func (s *server) handleFeed(w http.ResponseWriter, r *http.Request, claims *jwt.
 	}
 	s.attachAuthors(r.Context(), posts)
 
-	bariohttp.WriteJSON(w, http.StatusOK, postList{Posts: posts, NextCursor: nextCursor(posts, limit)})
+	// Ads are not load-bearing: any failure degrades to an organic-only feed.
+	var ads []servedAd
+	if s.ads != nil {
+		ads, err = s.ads.Serve(r.Context(), r.Header.Get("Authorization"), pages, limit)
+		if err != nil {
+			slog.Warn("serve ads", "error", err, "user_id", claims.UserID)
+			ads = nil
+		}
+	}
+
+	bariohttp.WriteJSON(w, http.StatusOK, feedList{
+		Items:      interleaveFeed(posts, ads),
+		NextCursor: nextCursor(posts, limit),
+	})
+}
+
+// interleaveFeed spreads ads evenly between organic posts. Ads never appear at
+// the front or trailing end unless there is no room between posts, and they do
+// not participate in cursor pagination.
+func interleaveFeed(posts []post, ads []servedAd) []any {
+	items := make([]any, 0, len(posts)+len(ads))
+	if len(posts) == 0 || len(ads) == 0 {
+		for _, p := range posts {
+			items = append(items, feedPostItem{Kind: "post", post: p})
+		}
+		return items
+	}
+
+	positions := make([]int, len(ads))
+	for i := range ads {
+		positions[i] = (i + 1) * len(posts) / (len(ads) + 1)
+	}
+
+	adIndex := 0
+	for adIndex < len(ads) && positions[adIndex] == 0 {
+		items = append(items, feedAdItem{Kind: "ad", servedAd: ads[adIndex]})
+		adIndex++
+	}
+	for i, p := range posts {
+		items = append(items, feedPostItem{Kind: "post", post: p})
+		for adIndex < len(ads) && positions[adIndex] == i+1 {
+			items = append(items, feedAdItem{Kind: "ad", servedAd: ads[adIndex]})
+			adIndex++
+		}
+	}
+	return items
 }
 
 // attachAuthors resolves display names through the auth service, caching each
@@ -369,6 +435,24 @@ func nextCursor(posts []post, limit int) *string {
 	return &cursor
 }
 
+// parsePages reads the optional pages counter used to scale ad density. It
+// mirrors the ads service: absent or negative values mean zero, invalid values
+// are a client error.
+func parsePages(w http.ResponseWriter, r *http.Request) (int, bool) {
+	pages := 0
+	if raw := r.URL.Query().Get("pages"); raw != "" {
+		value, err := strconv.Atoi(raw)
+		if err != nil {
+			bariohttp.WriteError(w, http.StatusBadRequest, "invalid pages")
+			return 0, false
+		}
+		if value > 0 {
+			pages = value
+		}
+	}
+	return pages, true
+}
+
 func parseID(w http.ResponseWriter, raw string) (int64, bool) {
 	id, err := strconv.ParseInt(raw, 10, 64)
 	if err != nil || id <= 0 {
@@ -423,6 +507,55 @@ func (c *followsClient) FollowingIDs(ctx context.Context, userID int64) ([]int64
 		}
 	}
 	return ids, nil
+}
+
+type servedAd struct {
+	ID           int64  `json:"id"`
+	AdvertiserID int64  `json:"advertiser_id"`
+	Title        string `json:"title"`
+	Body         string `json:"body"`
+}
+
+type adsClient struct {
+	baseURL string
+	http    *http.Client
+}
+
+func newAdsClient(baseURL string) *adsClient {
+	return &adsClient{
+		baseURL: strings.TrimRight(baseURL, "/"),
+		http:    &http.Client{Timeout: 3 * time.Second},
+	}
+}
+
+// Serve asks the ads service for ads for this feed page. The caller's bearer
+// token is forwarded because ads/serve requires auth.
+func (c *adsClient) Serve(ctx context.Context, authorization string, pages, limit int) ([]servedAd, error) {
+	if c.baseURL == "" {
+		return nil, errors.New("ADS_URL is not configured")
+	}
+	url := fmt.Sprintf("%s/ads/serve?pages=%d&limit=%d", c.baseURL, pages, limit)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	if authorization != "" {
+		req.Header.Set("Authorization", authorization)
+	}
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("call ads service: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("ads service returned %s", resp.Status)
+	}
+
+	var ads []servedAd
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&ads); err != nil {
+		return nil, fmt.Errorf("decode ads response: %w", err)
+	}
+	return ads, nil
 }
 
 func env(key, fallback string) string {

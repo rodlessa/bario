@@ -53,8 +53,11 @@ Every Go service:
 - `POST /posts` `{content, image_id?}` (auth) → `201 {id, ...}`
 - `GET /posts/{id}` → post + author
 - `GET /users/{id}/posts?cursor=&limit=` → that user's posts, newest first
-- `GET /feed?cursor=&limit=` (auth) → posts from users the caller follows (calls the
-  `follows` service over HTTP to get the followed ids), newest first
+- `GET /feed?cursor=&limit=&pages=` (auth) → `{items: [...], next_cursor}` mixing
+  `kind="post"` items from users the caller follows with `kind="ad"` items from
+  the `ads` service. Posts come first via the `follows` service; ads are
+  best-effort and degrade to an organic-only feed if `ads/serve` fails. The
+  cursor is derived only from the last organic post.
 - Table `posts(id, user_id, content, image_id, created_at)`.
 
 ### uploads — schema `uploads`

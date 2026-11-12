@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import { api, type Post } from '../api'
+import { api, type FeedItem } from '../api'
 import { useAuth } from '../auth'
 import PostList from '../components/PostList.vue'
 import { errorMessage } from '../utils'
 
 const { isAuthenticated } = useAuth()
 
-const posts = ref<Post[]>([])
+const items = ref<FeedItem[]>([])
 const cursor = ref<string | null>(null)
+const pagesLoaded = ref(0)
 const loading = ref(false)
 const loadingMore = ref(false)
 const loaded = ref(false)
@@ -26,9 +27,10 @@ async function loadFeed(reset: boolean): Promise<void> {
   }
   error.value = ''
   try {
-    const page = await api.getFeed(reset ? null : cursor.value)
-    posts.value = reset ? page.posts : [...posts.value, ...page.posts]
+    const page = await api.getFeed(reset ? null : cursor.value, reset ? 0 : pagesLoaded.value)
+    items.value = reset ? page.items : [...items.value, ...page.items]
     cursor.value = page.next_cursor
+    pagesLoaded.value = reset ? 1 : pagesLoaded.value + 1
     loaded.value = true
   } catch (err) {
     error.value = errorMessage(err, 'Could not load your feed')
@@ -48,8 +50,9 @@ watch(isAuthenticated, (authenticated) => {
   if (authenticated) {
     void loadFeed(true)
   } else {
-    posts.value = []
+    items.value = []
     cursor.value = null
+    pagesLoaded.value = 0
     loaded.value = false
   }
 })
@@ -78,7 +81,7 @@ watch(isAuthenticated, (authenticated) => {
     <p v-if="loading" class="panel muted">Loading feed…</p>
     <template v-else>
       <PostList
-        :posts="posts"
+        :items="items"
         :empty-text="loaded ? 'Your feed is empty. Open a profile and follow someone to fill it.' : 'No barios yet.'"
       />
       <div v-if="cursor" class="load-more">

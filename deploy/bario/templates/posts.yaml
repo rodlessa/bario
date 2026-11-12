@@ -80,6 +80,8 @@ spec:
               value: "http://{{ $fullname }}-auth:8080"
             - name: FOLLOWS_URL
               value: "http://{{ $fullname }}-follows:8080"
+            - name: ADS_URL
+              value: "http://{{ $fullname }}-ads:8087"
           readinessProbe:
             httpGet:
               path: /healthz

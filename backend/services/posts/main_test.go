@@ -112,8 +112,55 @@ type fakeFollows struct {
 	status int
 }
 
+type adsRequest struct {
+	pages         string
+	limit         string
+	authorization string
+}
+
+type fakeAds struct {
+	ads      []servedAd
+	status   int
+	requests []adsRequest
+}
+
 type errorResponse struct {
 	Error string `json:"error"`
+}
+
+type testFeedItem struct {
+	Kind         string  `json:"kind"`
+	ID           int64   `json:"id"`
+	UserID       int64   `json:"user_id"`
+	Content      string  `json:"content"`
+	ImageID      *string `json:"image_id"`
+	Author       author  `json:"author"`
+	AdvertiserID int64   `json:"advertiser_id"`
+	Title        string  `json:"title"`
+	Body         string  `json:"body"`
+}
+
+type testFeed struct {
+	Items      []testFeedItem `json:"items"`
+	NextCursor *string        `json:"next_cursor"`
+}
+
+func organicIDs(items []testFeedItem) []int64 {
+	ids := make([]int64, 0, len(items))
+	for _, item := range items {
+		if item.Kind == "post" {
+			ids = append(ids, item.ID)
+		}
+	}
+	return ids
+}
+
+func feedKinds(items []testFeedItem) []string {
+	kinds := make([]string, len(items))
+	for i, item := range items {
+		kinds[i] = item.Kind
+	}
+	return kinds
 }
 
 func resetPosts(t *testing.T) {
@@ -125,7 +172,16 @@ func resetPosts(t *testing.T) {
 
 func newTestAPI(t *testing.T, follows fakeFollows, names map[int64]string) (http.Handler, *jwt.Manager) {
 	t.Helper()
+	return newTestAPIWithAds(t, follows, &fakeAds{}, names)
+}
+
+func newTestAPIWithAds(t *testing.T, follows fakeFollows, ads *fakeAds, names map[int64]string) (http.Handler, *jwt.Manager) {
+	t.Helper()
 	resetPosts(t)
+
+	if ads == nil {
+		ads = &fakeAds{}
+	}
 
 	tokens, err := jwt.NewManager(testJWTSecret, time.Hour)
 	if err != nil {
@@ -163,11 +219,35 @@ func newTestAPI(t *testing.T, follows fakeFollows, names map[int64]string) (http
 	}))
 	t.Cleanup(followsServer.Close)
 
+	adsServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ads.requests = append(ads.requests, adsRequest{
+			pages:         r.URL.Query().Get("pages"),
+			limit:         r.URL.Query().Get("limit"),
+			authorization: r.Header.Get("Authorization"),
+		})
+		if r.URL.Path != "/ads/serve" {
+			http.NotFound(w, r)
+			return
+		}
+		if ads.status != 0 && ads.status != http.StatusOK {
+			http.Error(w, "ads unavailable", ads.status)
+			return
+		}
+		payload := ads.ads
+		if payload == nil {
+			payload = []servedAd{}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(payload)
+	}))
+	t.Cleanup(adsServer.Close)
+
 	srv := &server{
 		db:      testPool,
 		tokens:  tokens,
 		auth:    authclient.New(authServer.URL),
 		follows: newFollowsClient(followsServer.URL),
+		ads:     newAdsClient(adsServer.URL),
 	}
 	router := bariohttp.NewRouter(metrics.New("posts"))
 	srv.registerRoutes(router)
@@ -274,6 +354,18 @@ func assertIDs(t *testing.T, got []int64, want ...int64) {
 	for i := range want {
 		if got[i] != want[i] {
 			t.Fatalf("ids = %v, want %v", got, want)
+		}
+	}
+}
+
+func assertKinds(t *testing.T, got []string, want ...string) {
+	t.Helper()
+	if len(got) != len(want) {
+		t.Fatalf("kinds = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("kinds = %v, want %v", got, want)
 		}
 	}
 }
@@ -473,21 +565,25 @@ func TestFeedFilteringAndOrdering(t *testing.T) {
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d; body = %s", recorder.Code, http.StatusOK, recorder.Body.String())
 	}
-	got := decodeResponse[postList](t, recorder)
-	assertIDs(t, postIDs(got.Posts), 4, 3, 2, 1)
+	assertJSONKeys(t, recorder, "items", "next_cursor")
+	got := decodeResponse[testFeed](t, recorder)
+	assertIDs(t, organicIDs(got.Items), 4, 3, 2, 1)
 	if got.NextCursor != nil {
 		t.Fatalf("cursor = %q, want nil", *got.NextCursor)
 	}
-	for _, p := range got.Posts {
-		if p.ID == unfollowed.ID {
+	for _, item := range got.Items {
+		if item.Kind != "post" {
+			t.Fatalf("kind = %q, want post", item.Kind)
+		}
+		if item.ID == unfollowed.ID {
 			t.Fatal("feed included an unfollowed account's post")
 		}
-		if p.UserID != 2 && p.UserID != 3 {
-			t.Fatalf("feed included user %d", p.UserID)
+		if item.UserID != 2 && item.UserID != 3 {
+			t.Fatalf("feed included user %d", item.UserID)
 		}
 	}
-	if got.Posts[0].Author.Username != "carol" || got.Posts[2].Author.Username != "bob" {
-		t.Fatalf("authors = %q, %q", got.Posts[0].Author.Username, got.Posts[2].Author.Username)
+	if got.Items[0].Author.Username != "carol" || got.Items[2].Author.Username != "bob" {
+		t.Fatalf("authors = %q, %q", got.Items[0].Author.Username, got.Items[2].Author.Username)
 	}
 }
 
@@ -507,27 +603,27 @@ func TestFeedPagination(t *testing.T) {
 	unfollowed := createPost(t, handler, token4, "d1")
 
 	page1 := requestRaw(t, handler, http.MethodGet, "/feed?limit=2", caller, "")
-	got1 := decodeResponse[postList](t, page1)
-	assertIDs(t, postIDs(got1.Posts), 5, 4)
+	got1 := decodeResponse[testFeed](t, page1)
+	assertIDs(t, organicIDs(got1.Items), 5, 4)
 	if cursor := cursorValue(got1.NextCursor); cursor != "4" {
 		t.Fatalf("page1 cursor = %q, want 4", cursor)
 	}
 
 	page2 := requestRaw(t, handler, http.MethodGet, "/feed?limit=2&cursor=4", caller, "")
-	got2 := decodeResponse[postList](t, page2)
-	assertIDs(t, postIDs(got2.Posts), 3, 2)
+	got2 := decodeResponse[testFeed](t, page2)
+	assertIDs(t, organicIDs(got2.Items), 3, 2)
 	if cursor := cursorValue(got2.NextCursor); cursor != "2" {
 		t.Fatalf("page2 cursor = %q, want 2", cursor)
 	}
 
 	page3 := requestRaw(t, handler, http.MethodGet, "/feed?limit=2&cursor=2", caller, "")
-	got3 := decodeResponse[postList](t, page3)
-	assertIDs(t, postIDs(got3.Posts), 1)
+	got3 := decodeResponse[testFeed](t, page3)
+	assertIDs(t, organicIDs(got3.Items), 1)
 	if got3.NextCursor != nil {
 		t.Fatalf("page3 cursor = %q, want nil", *got3.NextCursor)
 	}
-	for _, p := range got1.Posts {
-		if p.ID == unfollowed.ID {
+	for _, item := range got1.Items {
+		if item.ID == unfollowed.ID {
 			t.Fatal("feed included an unfollowed account's post")
 		}
 	}
@@ -541,11 +637,11 @@ func TestFeedEmptyWhenFollowingNobody(t *testing.T) {
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d; body = %s", recorder.Code, http.StatusOK, recorder.Body.String())
 	}
-	got := decodeResponse[postList](t, recorder)
-	if len(got.Posts) != 0 || got.NextCursor != nil {
-		t.Fatalf("posts = %d, cursor = %v", len(got.Posts), got.NextCursor)
+	got := decodeResponse[testFeed](t, recorder)
+	if len(got.Items) != 0 || got.NextCursor != nil {
+		t.Fatalf("items = %d, cursor = %v", len(got.Items), got.NextCursor)
 	}
-	if !strings.Contains(recorder.Body.String(), `"posts":[]`) {
+	if !strings.Contains(recorder.Body.String(), `"items":[]`) {
 		t.Fatalf("empty feed was not encoded as []: %s", recorder.Body.String())
 	}
 }
@@ -556,4 +652,166 @@ func TestFeedFollowsError(t *testing.T) {
 
 	recorder := requestRaw(t, handler, http.MethodGet, "/feed", caller, "")
 	assertError(t, recorder, http.StatusBadGateway, "could not load the accounts you follow")
+}
+
+func TestFeedInterleavesAds(t *testing.T) {
+	names := map[int64]string{2: "bob"}
+	fake := &fakeAds{ads: []servedAd{
+		{ID: 901, AdvertiserID: 50, Title: "Ad one", Body: "First sponsored body"},
+		{ID: 902, AdvertiserID: 51, Title: "Ad two", Body: "Second sponsored body"},
+	}}
+	handler, tokens := newTestAPIWithAds(t, fakeFollows{ids: []int64{2}}, fake, names)
+	caller := tokenFor(t, tokens, 1, "alice")
+	token2 := tokenFor(t, tokens, 2, "bob")
+
+	for i := 1; i <= 4; i++ {
+		createPost(t, handler, token2, fmt.Sprintf("post-%d", i))
+	}
+
+	recorder := requestRaw(t, handler, http.MethodGet, "/feed", caller, "")
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body = %s", recorder.Code, http.StatusOK, recorder.Body.String())
+	}
+	got := decodeResponse[testFeed](t, recorder)
+
+	// Two ads across four posts are spread between organic items, not appended.
+	assertKinds(t, feedKinds(got.Items), "post", "ad", "post", "ad", "post", "post")
+	assertIDs(t, organicIDs(got.Items), 4, 3, 2, 1)
+	if got.Items[len(got.Items)-1].Kind != "post" {
+		t.Fatal("feed ended with an ad, want the last organic post")
+	}
+
+	if got.Items[1].ID != 901 || got.Items[1].Title != "Ad one" || got.Items[1].Body != "First sponsored body" {
+		t.Fatalf("first ad = %+v", got.Items[1])
+	}
+	if got.Items[3].ID != 902 || got.Items[3].AdvertiserID != 51 {
+		t.Fatalf("second ad = %+v", got.Items[3])
+	}
+
+	var payload struct {
+		Items []map[string]json.RawMessage `json:"items"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode feed items: %v", err)
+	}
+	postKeys := []string{"kind", "id", "user_id", "content", "image_id", "created_at", "author"}
+	adKeys := []string{"kind", "id", "advertiser_id", "title", "body"}
+	for i, item := range payload.Items {
+		want := postKeys
+		if i == 1 || i == 3 {
+			want = adKeys
+		}
+		if len(item) != len(want) {
+			t.Fatalf("item %d has %d keys, want %d: %v", i, len(item), len(want), item)
+		}
+		for _, key := range want {
+			if _, ok := item[key]; !ok {
+				t.Fatalf("item %d is missing key %q: %v", i, key, item)
+			}
+		}
+	}
+}
+
+func TestFeedAdsErrorDegradesToOrganicOnly(t *testing.T) {
+	names := map[int64]string{2: "bob"}
+	fake := &fakeAds{status: http.StatusInternalServerError}
+	handler, tokens := newTestAPIWithAds(t, fakeFollows{ids: []int64{2}}, fake, names)
+	caller := tokenFor(t, tokens, 1, "alice")
+	token2 := tokenFor(t, tokens, 2, "bob")
+
+	createPost(t, handler, token2, "b1")
+	createPost(t, handler, token2, "b2")
+
+	recorder := requestRaw(t, handler, http.MethodGet, "/feed", caller, "")
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body = %s", recorder.Code, http.StatusOK, recorder.Body.String())
+	}
+	got := decodeResponse[testFeed](t, recorder)
+	assertKinds(t, feedKinds(got.Items), "post", "post")
+	assertIDs(t, organicIDs(got.Items), 2, 1)
+	if got.NextCursor != nil {
+		t.Fatalf("cursor = %q, want nil", *got.NextCursor)
+	}
+}
+
+func TestFeedForwardsPagesAndAuthToAds(t *testing.T) {
+	names := map[int64]string{2: "bob"}
+	fake := &fakeAds{}
+	handler, tokens := newTestAPIWithAds(t, fakeFollows{ids: []int64{2}}, fake, names)
+	caller := tokenFor(t, tokens, 1, "alice")
+	token2 := tokenFor(t, tokens, 2, "bob")
+	createPost(t, handler, token2, "b1")
+
+	if recorder := requestRaw(t, handler, http.MethodGet, "/feed?pages=3&limit=2", caller, ""); recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d; body = %s", recorder.Code, recorder.Body.String())
+	}
+	if len(fake.requests) != 1 {
+		t.Fatalf("ads requests = %d, want 1", len(fake.requests))
+	}
+	got := fake.requests[0]
+	if got.pages != "3" || got.limit != "2" {
+		t.Fatalf("ads query pages=%q limit=%q, want 3 and 2", got.pages, got.limit)
+	}
+	if got.authorization != "Bearer "+caller {
+		t.Fatalf("ads authorization = %q, want caller token", got.authorization)
+	}
+
+	fake.requests = nil
+	if recorder := requestRaw(t, handler, http.MethodGet, "/feed", caller, ""); recorder.Code != http.StatusOK {
+		t.Fatalf("default pages status = %d; body = %s", recorder.Code, recorder.Body.String())
+	}
+	if len(fake.requests) != 1 || fake.requests[0].pages != "0" {
+		t.Fatalf("default ads request = %+v, want pages=0", fake.requests)
+	}
+}
+
+func TestFeedInvalidPages(t *testing.T) {
+	fake := &fakeAds{}
+	handler, tokens := newTestAPIWithAds(t, fakeFollows{ids: []int64{2}}, fake, nil)
+	caller := tokenFor(t, tokens, 1, "alice")
+
+	recorder := requestRaw(t, handler, http.MethodGet, "/feed?pages=nope", caller, "")
+	assertError(t, recorder, http.StatusBadRequest, "invalid pages")
+	if len(fake.requests) != 0 {
+		t.Fatalf("ads was called for an invalid pages value: %+v", fake.requests)
+	}
+}
+
+func TestFeedCursorUnaffectedByAdInterleaving(t *testing.T) {
+	names := map[int64]string{2: "bob"}
+	fake := &fakeAds{ads: []servedAd{
+		{ID: 701, AdvertiserID: 50, Title: "Ad A", Body: "A"},
+		{ID: 702, AdvertiserID: 50, Title: "Ad B", Body: "B"},
+	}}
+	handler, tokens := newTestAPIWithAds(t, fakeFollows{ids: []int64{2}}, fake, names)
+	caller := tokenFor(t, tokens, 1, "alice")
+	token2 := tokenFor(t, tokens, 2, "bob")
+
+	for i := 1; i <= 5; i++ {
+		createPost(t, handler, token2, fmt.Sprintf("post-%d", i))
+	}
+
+	page1 := requestRaw(t, handler, http.MethodGet, "/feed?limit=2", caller, "")
+	got1 := decodeResponse[testFeed](t, page1)
+	assertIDs(t, organicIDs(got1.Items), 5, 4)
+	if cursor := cursorValue(got1.NextCursor); cursor != "4" {
+		t.Fatalf("page1 cursor = %q, want 4", cursor)
+	}
+
+	page2 := requestRaw(t, handler, http.MethodGet, "/feed?limit=2&cursor=4", caller, "")
+	got2 := decodeResponse[testFeed](t, page2)
+	assertIDs(t, organicIDs(got2.Items), 3, 2)
+	if cursor := cursorValue(got2.NextCursor); cursor != "2" {
+		t.Fatalf("page2 cursor = %q, want 2", cursor)
+	}
+
+	page3 := requestRaw(t, handler, http.MethodGet, "/feed?limit=2&cursor=2", caller, "")
+	got3 := decodeResponse[testFeed](t, page3)
+	assertIDs(t, organicIDs(got3.Items), 1)
+	if got3.NextCursor != nil {
+		t.Fatalf("page3 cursor = %q, want nil", *got3.NextCursor)
+	}
+
+	seen := append(append(organicIDs(got1.Items), organicIDs(got2.Items)...), organicIDs(got3.Items)...)
+	assertIDs(t, seen, 5, 4, 3, 2, 1)
 }

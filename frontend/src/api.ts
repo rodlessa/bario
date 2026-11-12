@@ -28,6 +28,25 @@ export interface PostList {
   next_cursor: string | null
 }
 
+export interface FeedPostItem extends Post {
+  kind: 'post'
+}
+
+export interface FeedAdItem {
+  kind: 'ad'
+  id: number
+  advertiser_id: number
+  title: string
+  body: string
+}
+
+export type FeedItem = FeedPostItem | FeedAdItem
+
+export interface FeedResponse {
+  items: FeedItem[]
+  next_cursor: string | null
+}
+
 export interface LoginResponse {
   token: string
   user: User
@@ -129,8 +148,16 @@ export const api = {
     return request(`/api/posts/users/${id}/posts${cursorQuery(cursor)}`)
   },
 
-  getFeed(cursor?: string | null): Promise<PostList> {
-    return request(`/api/posts/feed${cursorQuery(cursor)}`)
+  getFeed(cursor?: string | null, pages = 0): Promise<FeedResponse> {
+    const params = new URLSearchParams()
+    if (cursor) {
+      params.set('cursor', cursor)
+    }
+    if (pages > 0) {
+      params.set('pages', String(pages))
+    }
+    const query = params.toString()
+    return request(`/api/posts/feed${query ? `?${query}` : ''}`)
   },
 
   getPost(id: number): Promise<Post> {
@@ -142,6 +169,10 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ content, image_id: imageId ?? null }),
     })
+  },
+
+  clickAd(id: number): Promise<void> {
+    return request(`/api/ads/${id}/click`, { method: 'POST' })
   },
 
   follow(id: number): Promise<{ following: boolean }> {

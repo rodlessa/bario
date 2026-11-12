@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { api, type Post, type User } from '../api'
+import { api, type FeedItem, type Post, type User } from '../api'
 import { useAuth } from '../auth'
 import PostList from '../components/PostList.vue'
 import { errorMessage, formatDate } from '../utils'
@@ -15,6 +15,7 @@ const isSelf = computed(() => state.user !== null && state.user.id === userId.va
 
 const profile = ref<User | null>(null)
 const posts = ref<Post[]>([])
+const feedItems = computed<FeedItem[]>(() => posts.value.map((post) => ({ kind: 'post', ...post })))
 const cursor = ref<string | null>(null)
 const followerCount = ref(0)
 const followingCount = ref(0)
@@ -138,7 +139,7 @@ watch(userId, () => {
     <p v-if="actionError" class="error" role="alert">{{ actionError }}</p>
 
     <h2 class="section-title">Barios</h2>
-    <PostList :posts="posts" empty-text="This profile has not barioed yet." />
+    <PostList :items="feedItems" empty-text="This profile has not barioed yet." />
 
     <div v-if="cursor" class="load-more">
       <button type="button" class="button" :disabled="loadingMore" @click="loadMore">
