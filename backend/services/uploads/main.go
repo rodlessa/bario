@@ -35,16 +35,43 @@ const (
 
 	moderationTimeout     = 5 * time.Second
 	moderationMaxResponse = 1 << 20 // 1 MiB
+
+	// hashMatcherName labels quarantine rows. Replace it with a stable
+	// provider name (for example "photodna" or "ncmec") when a real,
+	// registered hash-matching client is implemented.
+	hashMatcherName = "hash-matcher"
 )
 
 var idPattern = regexp.MustCompile(`^[a-f0-9]{32}$`)
 
 type server struct {
-	db         *sql.DB
-	tokens     *jwt.Manager
-	uploadDir  string
-	moderation *moderationClient
-	gore       *goreClient
+	db            *sql.DB
+	tokens        *jwt.Manager
+	uploadDir     string
+	quarantineDir string
+	moderation    *moderationClient
+	gore          *goreClient
+	hashMatcher   HashMatcher
+}
+
+// HashMatcher checks image bytes against a known-abuse hash corpus.
+//
+// Bario does not ship a CSAM detector. A real implementation would wrap the
+// Microsoft PhotoDNA Cloud Service or an NCMEC CyberTipline hash-matching
+// integration. Both require prior legal/organizational registration and an
+// agreement with the provider, so implementing one speculatively here would
+// be wrong. Implement this interface only after that agreement exists, then
+// replace noopHashMatcher in run().
+type HashMatcher interface {
+	Match(ctx context.Context, data []byte) (matched bool, err error)
+}
+
+// noopHashMatcher is the default seam. It performs no I/O and makes no network
+// calls, so current upload behavior and latency are unchanged.
+type noopHashMatcher struct{}
+
+func (noopHashMatcher) Match(context.Context, []byte) (bool, error) {
+	return false, nil
 }
 
 // nsfwScores is the exact JSON object returned by the NSFWJS sidecar.
@@ -239,14 +266,28 @@ func run() error {
 		)`,
 		`CREATE INDEX IF NOT EXISTS moderation_audit_user_id_idx ON uploads.moderation_audit (user_id)`,
 		`CREATE INDEX IF NOT EXISTS moderation_audit_created_at_idx ON uploads.moderation_audit (created_at)`,
+		`CREATE TABLE IF NOT EXISTS uploads.quarantine (
+			id TEXT PRIMARY KEY,
+			user_id BIGINT NOT NULL,
+			filename TEXT NOT NULL,
+			content_type TEXT NOT NULL,
+			size BIGINT NOT NULL,
+			matched_by TEXT NOT NULL,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+		)`,
+		`CREATE INDEX IF NOT EXISTS quarantine_user_id_idx ON uploads.quarantine (user_id)`,
+		`CREATE INDEX IF NOT EXISTS quarantine_created_at_idx ON uploads.quarantine (created_at)`,
 	); err != nil {
 		return err
 	}
 
-	uploadDir := env("UPLOAD_DIR", "/data/uploads")
+	uploadDir := filepath.Clean(env("UPLOAD_DIR", "/data/uploads"))
 	if err := os.MkdirAll(uploadDir, 0o755); err != nil {
 		return err
 	}
+	// Keep quarantined bytes outside the public upload tree. The directory is
+	// created lazily only when a matcher reports a hit.
+	quarantineDir := filepath.Clean(env("QUARANTINE_DIR", filepath.Join(filepath.Dir(uploadDir), "quarantine")))
 
 	tokens, err := jwt.NewManager(os.Getenv("JWT_SECRET"), 24*time.Hour)
 	if err != nil {
@@ -287,11 +328,15 @@ func run() error {
 	)
 
 	srv := &server{
-		db:         pool,
-		tokens:     tokens,
-		uploadDir:  uploadDir,
-		moderation: newModerationClient(moderationURL, threshold, includeSexy, failOpen),
-		gore:       newGoreClient(goreURL, goreThreshold),
+		db:            pool,
+		tokens:        tokens,
+		uploadDir:     uploadDir,
+		quarantineDir: quarantineDir,
+		moderation:    newModerationClient(moderationURL, threshold, includeSexy, failOpen),
+		gore:          newGoreClient(goreURL, goreThreshold),
+		// This is the single seam for CSAM hash matching. Do not replace it
+		// with a network client until a PhotoDNA or NCMEC agreement exists.
+		hashMatcher: noopHashMatcher{},
 	}
 	m := metrics.New("uploads")
 	router := bariohttp.NewRouter(m)
@@ -373,16 +418,18 @@ func (s *server) handleUpload(w http.ResponseWriter, r *http.Request, claims *jw
 	filename = truncate(filename, 200)
 
 	var (
-		nsfwResult nsfwScores
-		goreResult goreScores
-		nsfwErr    error
-		goreErr    error
+		nsfwResult  nsfwScores
+		goreResult  goreScores
+		nsfwErr     error
+		goreErr     error
+		hashMatched bool
+		hashErr     error
 	)
 
-	// The sidecars are independent, so classify concurrently instead of
-	// paying their latencies serially.
+	// The sidecars and the hash matcher are independent, so run them
+	// concurrently instead of paying their latencies serially.
 	var wg sync.WaitGroup
-	wg.Add(2)
+	wg.Add(3)
 	go func() {
 		defer wg.Done()
 		nsfwResult, nsfwErr = s.moderation.classify(r.Context(), data, contentType)
@@ -391,7 +438,42 @@ func (s *server) handleUpload(w http.ResponseWriter, r *http.Request, claims *jw
 		defer wg.Done()
 		goreResult, goreErr = s.gore.classify(r.Context(), data, contentType)
 	}()
+	go func() {
+		defer wg.Done()
+		matchCtx, cancel := context.WithTimeout(r.Context(), moderationTimeout)
+		defer cancel()
+		hashMatched, hashErr = s.hashMatcher.Match(matchCtx, data)
+	}()
 	wg.Wait()
+
+	// Hash matching is a separate safeguard from the content classifiers. If
+	// the matcher errors, fail closed regardless of MODERATION_FAIL_OPEN, and
+	// never fall through to normal storage.
+	if hashErr != nil {
+		slog.Error("csam hash matcher failed", "error", hashErr, "user_id", claims.UserID)
+		bariohttp.WriteError(w, http.StatusServiceUnavailable, "image moderation is unavailable; try again later")
+		return
+	}
+	if hashMatched {
+		if err := s.quarantineUpload(r.Context(), id, claims.UserID, filename, contentType, data); err != nil {
+			slog.Error("could not quarantine hash-matched upload",
+				"error", err,
+				"id", id,
+				"user_id", claims.UserID,
+			)
+			bariohttp.WriteError(w, http.StatusInternalServerError, "could not store image")
+			return
+		}
+		slog.Error("possible CSAM hash match; upload quarantined",
+			"event", "csam_hash_match",
+			"id", id,
+			"user_id", claims.UserID,
+			"size", len(data),
+			"matched_by", hashMatcherName,
+		)
+		bariohttp.WriteError(w, http.StatusUnavailableForLegalReasons, "image rejected by content moderation")
+		return
+	}
 
 	scores := &combinedScores{}
 	if nsfwErr == nil {
@@ -539,6 +621,36 @@ func (s *server) recordModerationAudit(ctx context.Context, id string, userID in
 	if err != nil {
 		slog.Error("record moderation audit", "error", err, "id", id, "status", status)
 	}
+}
+
+// quarantineUpload stores bytes outside the public upload tree and records the
+// hit in uploads.quarantine. This is the operational trigger point for a
+// future NCMEC CyberTipline report; the report itself is out of scope.
+func (s *server) quarantineUpload(ctx context.Context, id string, userID int64, filename, contentType string, data []byte) error {
+	qctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), moderationTimeout)
+	defer cancel()
+
+	if err := os.MkdirAll(s.quarantineDir, 0o700); err != nil {
+		return fmt.Errorf("create quarantine directory: %w", err)
+	}
+	path := filepath.Join(s.quarantineDir, id)
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		return fmt.Errorf("write quarantine file: %w", err)
+	}
+
+	_, err := s.db.ExecContext(qctx,
+		`INSERT INTO uploads.quarantine
+			(id, user_id, filename, content_type, size, matched_by)
+		 VALUES ($1, $2, $3, $4, $5, $6)`,
+		id, userID, filename, contentType, len(data), hashMatcherName,
+	)
+	if err != nil {
+		if removeErr := os.Remove(path); removeErr != nil {
+			slog.Error("remove orphaned quarantine file", "error", removeErr, "path", path)
+		}
+		return fmt.Errorf("insert quarantine row: %w", err)
+	}
+	return nil
 }
 
 func (s *server) handleGetImage(w http.ResponseWriter, r *http.Request) {

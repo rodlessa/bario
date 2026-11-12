@@ -219,6 +219,25 @@ Uploads are screened by the moderation sidecar. Images whose risky score meets
 failures fail closed unless `MODERATION_FAIL_OPEN=true`. See
 `backend/services/uploads/README.md`.
 
+### CSAM and abuse detection
+
+Bario's image moderation does **not** detect child sexual abuse material
+(CSAM). NSFWJS classifies pornographic and hentai imagery, and the CLIP
+zero-shot classifier covers graphic violence and gore; neither model can
+identify CSAM. No free or open-source ML detector for CSAM exists that we can
+self-host today. The uploads service exposes a hash-matcher seam, but it is a
+no-op and ships no CSAM detection.
+
+Production CSAM detection requires a known-abuse hash corpus and a legal
+reporting relationship. The supported paths are Microsoft's PhotoDNA Cloud
+Service (free for qualifying non-profit/NGO and some commercial organizations;
+hash matching against a known-abuse-image database, via Microsoft/NCMEC) and
+direct integration with the NCMEC CyberTipline reporting API. Both require
+registration or an agreement with the relevant organization; Bario does not
+ship either client. See
+[`backend/services/uploads/README.md`](backend/services/uploads/README.md) for
+the quarantine seam.
+
 Protected requests use `Authorization: Bearer <token>`.
 
 Example:
