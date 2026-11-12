@@ -171,6 +171,13 @@ postgres:
   password: ""
   storage: 1Gi
   storageClassName: ""
+  # postgres:16-alpine runs as uid/gid 70. Running the pod as that user makes
+  # the entrypoint skip its su-exec step, which hangs under k3s. Only change
+  # this if the image's postgres user changes.
+  securityContext:
+    runAsUser: 70
+    runAsGroup: 70
+    fsGroup: 70
   # Heavy service: on the Orange Pi cluster pin this to the master with the
   # other stateful/heavy workloads. Optional; empty keeps the scheduler defaults.
   nodeSelector: {}

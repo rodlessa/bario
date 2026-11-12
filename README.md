@@ -114,6 +114,10 @@ and resources. Secrets are never committed:
   expanded at container start and is never baked into an image or a manifest.
 - `JWT_SECRET` is mounted from the `bario-jwt` Secret and shared by all four
   services.
+- `postgres.securityContext` defaults to uid/gid 70, the `postgres` user in
+  `postgres:16-alpine`. Running the pod as that user makes the image entrypoint
+  skip its `su-exec postgres` step, which hangs in the k3s pod environment.
+  Only override this if the image's postgres user changes.
 
 To supply your own values for a local install:
 
