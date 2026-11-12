@@ -1,6 +1,13 @@
 nameOverride: ""
 fullnameOverride: ""
 
+global:
+  # Optional registry prefix applied to every image built from this chart
+  # (the services.* images and the frontend). Leave empty to use the
+  # repositories exactly as written below.
+  # Example: 127.0.0.1:5000 -> 127.0.0.1:5000/bario/auth
+  registry: ""
+
 imagePullSecrets: []
 
 # One entry per workload service. Go services expose :8080 (API) and :9090
@@ -13,6 +20,10 @@ services:
       repository: bario/auth
       tag: latest
       pullPolicy: IfNotPresent
+    # Optional scheduling constraints; empty keeps the scheduler defaults.
+    nodeSelector: {}
+    affinity: {}
+    tolerations: []
     resources:
       requests:
         cpu: 25m
@@ -26,6 +37,10 @@ services:
       repository: bario/posts
       tag: latest
       pullPolicy: IfNotPresent
+    # Optional scheduling constraints; empty keeps the scheduler defaults.
+    nodeSelector: {}
+    affinity: {}
+    tolerations: []
     resources:
       requests:
         cpu: 25m
@@ -39,6 +54,10 @@ services:
       repository: bario/uploads
       tag: latest
       pullPolicy: IfNotPresent
+    # Optional scheduling constraints; empty keeps the scheduler defaults.
+    nodeSelector: {}
+    affinity: {}
+    tolerations: []
     resources:
       requests:
         cpu: 25m
@@ -52,6 +71,10 @@ services:
       repository: bario/follows
       tag: latest
       pullPolicy: IfNotPresent
+    # Optional scheduling constraints; empty keeps the scheduler defaults.
+    nodeSelector: {}
+    affinity: {}
+    tolerations: []
     resources:
       requests:
         cpu: 25m
@@ -65,28 +88,42 @@ services:
       repository: bario/moderation
       tag: latest
       pullPolicy: IfNotPresent
-    # NSFWJS/tfjs-node: model weights are bundled in the image.
+    # Heavy service: on the Orange Pi cluster pin this to the master, e.g.
+    # nodeSelector {node-type: heavy} plus a toleration for the control-plane taint.
+    # Optional scheduling constraints; empty keeps the scheduler defaults.
+    nodeSelector: {}
+    affinity: {}
+    tolerations: []
+    # NSFWJS/tfjs-node: model weights are bundled in the image. The 1Gi limit
+    # keeps the service schedulable on the 4Gi master.
     resources:
       requests:
         cpu: 250m
         memory: 512Mi
       limits:
         cpu: "1"
-        memory: 2Gi
+        memory: 1Gi
   moderation-gore:
     replicas: 1
     image:
       repository: bario/moderation-gore
       tag: latest
       pullPolicy: IfNotPresent
-    # CLIP ViT-B/32 + CPU PyTorch; heavier than the NSFWJS sidecar.
+    # Heavy service: on the Orange Pi cluster pin this to the master, e.g.
+    # nodeSelector {node-type: heavy} plus a toleration for the control-plane taint.
+    # Optional scheduling constraints; empty keeps the scheduler defaults.
+    nodeSelector: {}
+    affinity: {}
+    tolerations: []
+    # CLIP ViT-B/32 + CPU PyTorch; heavier than the NSFWJS sidecar. The 2Gi
+    # limit keeps the service schedulable on the 4Gi master.
     resources:
       requests:
         cpu: 500m
         memory: 1Gi
       limits:
         cpu: "2"
-        memory: 3Gi
+        memory: 2Gi
 
 frontend:
   replicas: 1
@@ -94,6 +131,10 @@ frontend:
     repository: bario/frontend
     tag: latest
     pullPolicy: IfNotPresent
+  # Optional scheduling constraints; empty keeps the scheduler defaults.
+  nodeSelector: {}
+  affinity: {}
+  tolerations: []
   resources:
     requests:
       cpu: 25m
@@ -113,6 +154,11 @@ postgres:
   password: ""
   storage: 1Gi
   storageClassName: ""
+  # Heavy service: on the Orange Pi cluster pin this to the master with the
+  # other stateful/heavy workloads. Optional; empty keeps the scheduler defaults.
+  nodeSelector: {}
+  affinity: {}
+  tolerations: []
   resources:
     requests:
       cpu: 100m
@@ -148,6 +194,10 @@ prometheus:
     tag: v2.54.1
   retention: 6h
   scrapeInterval: 15s
+  # Optional scheduling constraints; empty keeps the scheduler defaults.
+  nodeSelector: {}
+  affinity: {}
+  tolerations: []
   resources:
     requests:
       cpu: 50m

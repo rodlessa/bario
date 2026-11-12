@@ -128,11 +128,43 @@ Do not commit an override file containing real secrets. To use a different
 image registry or tag:
 
 ```bash
+# Prefix every chart-built image (services.* and frontend) with one registry:
+helm upgrade --install bario deploy/bario \
+  --namespace bario --create-namespace \
+  --set global.registry=127.0.0.1:5000
+# or point the Makefile at the registry (it overrides each image repository):
 make docker-build REGISTRY=registry.example.com/bario TAG=1.0.0
 make helm-install \
   REGISTRY=registry.example.com/bario TAG=1.0.0
 # or override each service image explicitly with --set services.auth.image.repository=...
 ```
+
+`global.registry` is a plain prefix (host and optional port), so the default
+`bario/auth` becomes `127.0.0.1:5000/bario/auth`. Upstream images (`postgres`,
+`prom/prometheus`) are not affected. For the Orange Pi cluster, build and push
+multi-arch images with `make docker-buildx` before installing the chart.
+
+Workload scheduling is configurable per service under `services.<name>`,
+`frontend`, `postgres` and `prometheus` (`nodeSelector`, `affinity`,
+`tolerations`). All default to empty, which preserves the previous behavior.
+For the Orange Pi split, set the heavy workloads (`moderation`,
+`moderation-gore`, `postgres`) to the master and the light ones (`auth`,
+`posts`, `uploads`, `follows`, `frontend`) to the workers, e.g.:
+
+```bash
+helm upgrade --install bario deploy/bario --namespace bario \
+  --set services.moderation.nodeSelector.node-type=heavy \
+  --set services.moderation-gore.nodeSelector.node-type=heavy \
+  --set postgres.nodeSelector.node-type=heavy \
+  --set services.auth.nodeSelector.node-type=light \
+  --set services.posts.nodeSelector.node-type=light \
+  --set services.uploads.nodeSelector.node-type=light \
+  --set services.follows.nodeSelector.node-type=light \
+  --set frontend.nodeSelector.node-type=light
+```
+
+If the master is tainted with `node-role.kubernetes.io/control-plane:NoSchedule`,
+also add a matching `tolerations` entry to the heavy workloads.
 
 The chart deploys the two moderation sidecars as internal-only ClusterIP
 services (`moderation` on 8085/9095 and `moderation-gore` on 8086/9096). Set
@@ -329,12 +361,14 @@ upload and preview).
 | `make test`      | `go vet` plus Vue/TypeScript type checking                    |
 | `make guard`     | Deterministic secret scan of staged changes                   |
 | `make docker-build` | Build the four service images and the frontend image       |
+| `make docker-buildx` | Build and push multi-arch images (`linux/amd64,linux/arm64`) |
 | `make helm-install` | `helm upgrade --install` into `NAMESPACE` (`bario`)        |
 | `make helm-upgrade` | `helm upgrade` an existing release                         |
 | `make helm-template` | Render the chart locally                                  |
 | `make helm-lint` | Lint the chart                                                |
 
-Override variables: `REGISTRY`, `TAG`, `NAMESPACE`, `RELEASE`, `HELM`.
+Override variables: `REGISTRY`, `TAG`, `PLATFORMS`, `BUILDX_BUILDER`,
+`NAMESPACE`, `RELEASE`, `HELM`.
 
 ## Notes
 

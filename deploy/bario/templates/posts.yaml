@@ -26,6 +26,18 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- with $svc.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $svc.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $svc.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
@@ -34,7 +46,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: posts
-          image: "{{ $svc.image.repository }}:{{ $svc.image.tag }}"
+          image: {{ include "bario.image" (dict "root" . "image" $svc.image) | quote }}
           imagePullPolicy: {{ $svc.image.pullPolicy }}
           securityContext:
             allowPrivilegeEscalation: false
