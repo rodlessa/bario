@@ -10,16 +10,18 @@ Prometheus metrics on a private, cluster-only port.
 | Layer    | Tech                                                     |
 | -------- | -------------------------------------------------------- |
 | Backend  | Go (4 services: auth, posts, uploads, follows)           |
-| Moderation | Node 22 + NSFWJS sidecar (standalone, not wired in yet) |
+| Moderation | Node 22 + NSFWJS sidecar (screens uploads)              |
 | Frontend | Vue 3 + TypeScript + Vite, served by nginx               |
 | Database | PostgreSQL 16, one schema per service                    |
 | Deploy   | Docker images + Helm chart + nginx Ingress               |
 | Metrics  | Prometheus, scraping cluster-only `*-metrics` Services   |
 
 Each Go service listens on `:8080` for JSON and `:9090` for `/metrics`. Both
-ports come from `HTTP_PORT` and `METRICS_PORT`. The standalone moderation
-sidecar uses `:8085` for JSON and `:9095` for `/metrics` locally; see
-`backend/services/moderation/README.md`.
+ports come from `HTTP_PORT` and `METRICS_PORT`. The moderation sidecar uses
+`:8085` for JSON and `:9095` for `/metrics` locally; the uploads service calls
+it at `MODERATION_URL` (default `http://localhost:8085`). See
+`backend/services/moderation/README.md` and
+`backend/services/uploads/README.md`.
 
 ## Layout
 
@@ -36,7 +38,7 @@ bario/
 │       ├── posts/
 │       ├── uploads/
 │       ├── follows/
-│       └── moderation/       # Node + NSFWJS sidecar (standalone)
+│       └── moderation/       # Node + NSFWJS sidecar (uploads moderation)
 ├── frontend/                 # Vue 3 + TS + Vite + nginx
 └── deploy/bario/             # Helm chart
 ```
@@ -145,8 +147,10 @@ cd backend
 ```
 
 The optional moderation sidecar is a separate Node service on `:8085`
-(metrics `:9095`). It is not wired into uploads yet; see
-`backend/services/moderation/README.md` to run it.
+(metrics `:9095`). The uploads service calls it for every image; start the
+sidecar before uploading, otherwise uploads fail closed with `503`. See
+`backend/services/moderation/README.md` and
+`backend/services/uploads/README.md` to run them.
 
 Then run the SPA:
 
@@ -198,6 +202,11 @@ services mount the same handlers under both the bare path and that prefix.
 | follows | `DELETE /users/{id}/follow`              | yes  | Unfollow a user                          |
 | follows | `GET /users/{id}/followers`              | no   | `[{id, username}]`                       |
 | follows | `GET /users/{id}/following`              | no   | `[{id, username}]`                       |
+
+Uploads are screened by the moderation sidecar. Images whose risky score meets
+`MODERATION_REJECT_THRESHOLD` return `451` and are not stored; classifier
+failures fail closed unless `MODERATION_FAIL_OPEN=true`. See
+`backend/services/uploads/README.md`.
 
 Protected requests use `Authorization: Bearer <token>`.
 
