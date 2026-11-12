@@ -1,13 +1,15 @@
 // Command ads serves advertising campaigns for Bario. This scaffold implements
-// authenticated campaign creation and listing; serving, status changes and
-// click tracking arrive in follow-up tasks.
+// authenticated campaign creation, listing, and owner-only status updates;
+// serving and click tracking arrive in follow-up tasks.
 package main
 
 import (
 	"database/sql"
+	"errors"
 	"log/slog"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -25,6 +27,10 @@ const (
 
 	maxTitleLength = 120
 	maxBodyLength  = 2000
+
+	// Intentionally small status enum for this scaffold.
+	statusActive = "active"
+	statusPaused = "paused"
 )
 
 // adsMigrations is shared with main_test.go so tests apply exactly the schema
@@ -85,6 +91,10 @@ type createAdRequest struct {
 	BudgetCents int64    `json:"budget_cents"`
 }
 
+type updateAdRequest struct {
+	Status string `json:"status"`
+}
+
 func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
 	if err := run(); err != nil {
@@ -126,11 +136,14 @@ func (s *server) registerRoutes(router *bariohttp.Router) {
 
 	create := bariohttp.RequireAuth(s.tokens, s.handleCreateAd)
 	list := bariohttp.RequireAuth(s.tokens, s.handleListAds)
+	update := bariohttp.RequireAuth(s.tokens, s.handleUpdateAd)
 
 	router.Post("/ads", "create_ad", create)
 	router.Post("/api/ads", "create_ad", create)
 	router.Get("/ads", "list_ads", list)
 	router.Get("/api/ads", "list_ads", list)
+	router.Patch("/ads/{id}", "update_ad", update)
+	router.Patch("/api/ads/{id}", "update_ad", update)
 }
 
 func (s *server) handleCreateAd(w http.ResponseWriter, r *http.Request, claims *jwt.Claims) {
@@ -190,6 +203,61 @@ func (s *server) handleCreateAd(w http.ResponseWriter, r *http.Request, claims *
 	bariohttp.WriteJSON(w, http.StatusCreated, created)
 }
 
+func (s *server) handleUpdateAd(w http.ResponseWriter, r *http.Request, claims *jwt.Claims) {
+	id, ok := parseID(w, r.PathValue("id"))
+	if !ok {
+		return
+	}
+
+	var req updateAdRequest
+	if !bariohttp.DecodeJSON(w, r, &req) {
+		return
+	}
+
+	// Intentionally a small enum for now; future statuses need an explicit
+	// product decision and migration.
+	status := strings.TrimSpace(req.Status)
+	if status != statusActive && status != statusPaused {
+		bariohttp.WriteError(w, http.StatusBadRequest, `status must be "active" or "paused"`)
+		return
+	}
+
+	var updated ad
+	err := s.db.QueryRowContext(r.Context(),
+		`UPDATE ads.advertisements
+		 SET status = $1, updated_at = now()
+		 WHERE id = $2 AND advertiser_id = $3
+		 RETURNING id, advertiser_id, title, body, target_tags, budget_cents, status, created_at, updated_at`,
+		status, id, claims.UserID,
+	).Scan(
+		&updated.ID,
+		&updated.AdvertiserID,
+		&updated.Title,
+		&updated.Body,
+		pq.Array(&updated.TargetTags),
+		&updated.BudgetCents,
+		&updated.Status,
+		&updated.CreatedAt,
+		&updated.UpdatedAt,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		// Not-found and not-owned share this response so non-owners cannot
+		// probe which ad ids exist.
+		bariohttp.WriteError(w, http.StatusNotFound, "ad not found")
+		return
+	}
+	if err != nil {
+		slog.Error("update advertisement", "error", err, "id", id, "advertiser", claims.UserID)
+		bariohttp.WriteError(w, http.StatusInternalServerError, "could not update ad")
+		return
+	}
+	if updated.TargetTags == nil {
+		updated.TargetTags = []string{}
+	}
+
+	bariohttp.WriteJSON(w, http.StatusOK, updated)
+}
+
 func (s *server) handleListAds(w http.ResponseWriter, r *http.Request, claims *jwt.Claims) {
 	rows, err := s.db.QueryContext(r.Context(),
 		`SELECT id, advertiser_id, title, body, target_tags, budget_cents, status, created_at, updated_at
@@ -242,4 +310,13 @@ func env(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func parseID(w http.ResponseWriter, raw string) (int64, bool) {
+	id, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || id <= 0 {
+		bariohttp.WriteError(w, http.StatusBadRequest, "invalid id")
+		return 0, false
+	}
+	return id, true
 }

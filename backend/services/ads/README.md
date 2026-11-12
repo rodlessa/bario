@@ -76,12 +76,28 @@ newest first (`id DESC`). An advertiser with no campaigns gets `[]`.
 curl -s http://localhost:8087/ads -H "Authorization: Bearer $TOKEN"
 ```
 
+### `PATCH /ads/{id}` (also `/api/ads/{id}`)
+
+Requires auth and ownership. Only the ad's `advertiser_id` can update it.
+
+```bash
+curl -s -X PATCH http://localhost:8087/ads/1 \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"status":"paused"}'
+```
+
+The status enum is intentionally small for now: only `active` and `paused`
+are accepted; any other value returns `400`. Updating another advertiser's ad
+or a nonexistent id returns `404` (the two cases are indistinguishable to
+avoid leaking which ids exist). Success returns the full updated ad and
+advances `updated_at`.
+
 ### `GET /healthz` (also `/api/ads/healthz`)
 
 Returns `{"status":"ok"}`.
 
-Not implemented yet: `PATCH /ads/{id}`, `POST /ads/{id}/click`, `GET /ads/serve`.
-The shared `bariohttp.Router` already has a `Patch` helper for the next task.
+Not implemented yet: `POST /ads/{id}/click`, `GET /ads/serve`.
 
 ## Run locally
 
@@ -96,8 +112,8 @@ go run .
 
 Migrations run automatically on startup. Override `HTTP_PORT` and
 `METRICS_PORT` if needed. Metrics are exposed separately at
-`http://localhost:9097/metrics` with endpoint labels `create_ad` and
-`list_ads` (plus `health`).
+`http://localhost:9097/metrics` with endpoint labels `create_ad`, `list_ads`,
+and `update_ad` (plus `health`).
 
 ## Tests
 

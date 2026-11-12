@@ -445,3 +445,138 @@ func TestSchemaTablesExist(t *testing.T) {
 		})
 	}
 }
+
+func patchAd(t *testing.T, handler http.Handler, token string, id int64, status string) *httptest.ResponseRecorder {
+	t.Helper()
+	return requestJSON(t, handler, http.MethodPatch, fmt.Sprintf("/ads/%d", id), token,
+		map[string]string{"status": status})
+}
+
+func TestUpdateAdStatus(t *testing.T) {
+	handler, tokens := newTestAPI(t)
+	token := tokenFor(t, tokens, 7, "advertiser")
+	created := createAd(t, handler, token, adInput{
+		Title: "Toggle", Body: "Status test", TargetTags: []string{"tech"}, BudgetCents: 100,
+	})
+
+	time.Sleep(2 * time.Millisecond)
+	pausedRecorder := patchAd(t, handler, token, created.ID, "paused")
+	if pausedRecorder.Code != http.StatusOK {
+		t.Fatalf("pause status = %d, want %d; body = %s",
+			pausedRecorder.Code, http.StatusOK, pausedRecorder.Body.String())
+	}
+	assertAdKeys(t, pausedRecorder)
+	paused := decodeResponse[adResponse](t, pausedRecorder)
+	if paused.ID != created.ID || paused.Status != "paused" {
+		t.Fatalf("paused ad = %+v", paused)
+	}
+	if !paused.CreatedAt.Equal(created.CreatedAt) {
+		t.Fatalf("created_at changed: %v -> %v", created.CreatedAt, paused.CreatedAt)
+	}
+	if !paused.UpdatedAt.After(created.UpdatedAt) {
+		t.Fatalf("updated_at did not increase: %v -> %v", created.UpdatedAt, paused.UpdatedAt)
+	}
+
+	time.Sleep(2 * time.Millisecond)
+	activeRecorder := patchAd(t, handler, token, created.ID, "active")
+	if activeRecorder.Code != http.StatusOK {
+		t.Fatalf("activate status = %d, want %d; body = %s",
+			activeRecorder.Code, http.StatusOK, activeRecorder.Body.String())
+	}
+	active := decodeResponse[adResponse](t, activeRecorder)
+	if active.Status != "active" {
+		t.Fatalf("active ad status = %q", active.Status)
+	}
+	if !active.UpdatedAt.After(paused.UpdatedAt) {
+		t.Fatalf("updated_at did not increase again: %v -> %v", paused.UpdatedAt, active.UpdatedAt)
+	}
+
+	var dbStatus string
+	var dbUpdated time.Time
+	if err := testPool.QueryRowContext(context.Background(),
+		`SELECT status, updated_at FROM ads.advertisements WHERE id = $1`, created.ID,
+	).Scan(&dbStatus, &dbUpdated); err != nil {
+		t.Fatalf("query updated ad: %v", err)
+	}
+	if dbStatus != "active" || !dbUpdated.Equal(active.UpdatedAt) {
+		t.Fatalf("stored status/updated_at = %q/%v", dbStatus, dbUpdated)
+	}
+}
+
+func TestUpdateAdInvalidStatus(t *testing.T) {
+	handler, tokens := newTestAPI(t)
+	token := tokenFor(t, tokens, 7, "advertiser")
+	created := createAd(t, handler, token, adInput{
+		Title: "Invalid", Body: "Status test", BudgetCents: 100,
+	})
+
+	cases := []struct {
+		name   string
+		status string
+	}{
+		{"archived", "archived"},
+		{"empty", ""},
+		{"uppercase", "ACTIVE"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			recorder := patchAd(t, handler, token, created.ID, tc.status)
+			assertError(t, recorder, http.StatusBadRequest, `status must be "active" or "paused"`)
+		})
+	}
+
+	var dbStatus string
+	if err := testPool.QueryRowContext(context.Background(),
+		`SELECT status FROM ads.advertisements WHERE id = $1`, created.ID,
+	).Scan(&dbStatus); err != nil {
+		t.Fatalf("query ad status: %v", err)
+	}
+	if dbStatus != "active" {
+		t.Fatalf("invalid update changed status to %q", dbStatus)
+	}
+}
+
+func TestUpdateAdOtherOwner(t *testing.T) {
+	handler, tokens := newTestAPI(t)
+	ownerToken := tokenFor(t, tokens, 1, "alice")
+	otherToken := tokenFor(t, tokens, 2, "bob")
+	created := createAd(t, handler, ownerToken, adInput{
+		Title: "Owned", Body: "Status test", BudgetCents: 100,
+	})
+
+	recorder := patchAd(t, handler, otherToken, created.ID, "paused")
+	assertError(t, recorder, http.StatusNotFound, "ad not found")
+
+	var dbStatus string
+	var dbUpdated time.Time
+	if err := testPool.QueryRowContext(context.Background(),
+		`SELECT status, updated_at FROM ads.advertisements WHERE id = $1`, created.ID,
+	).Scan(&dbStatus, &dbUpdated); err != nil {
+		t.Fatalf("query ad: %v", err)
+	}
+	if dbStatus != "active" {
+		t.Fatalf("other owner changed status to %q", dbStatus)
+	}
+	if !dbUpdated.Equal(created.UpdatedAt) {
+		t.Fatalf("other owner touched updated_at: %v -> %v", created.UpdatedAt, dbUpdated)
+	}
+}
+
+func TestUpdateAdNotFound(t *testing.T) {
+	handler, tokens := newTestAPI(t)
+	token := tokenFor(t, tokens, 1, "alice")
+
+	recorder := patchAd(t, handler, token, 999999, "paused")
+	assertError(t, recorder, http.StatusNotFound, "ad not found")
+}
+
+func TestUpdateAdUnauthenticated(t *testing.T) {
+	handler, tokens := newTestAPI(t)
+	token := tokenFor(t, tokens, 1, "alice")
+	created := createAd(t, handler, token, adInput{
+		Title: "Auth", Body: "Status test", BudgetCents: 100,
+	})
+
+	recorder := patchAd(t, handler, "", created.ID, "paused")
+	assertError(t, recorder, http.StatusUnauthorized, "authentication required")
+}
