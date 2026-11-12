@@ -13,7 +13,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
+	"github.com/lib/pq"
 	"golang.org/x/crypto/bcrypt"
 
 	"bario/pkg/db"
@@ -22,7 +24,12 @@ import (
 	"bario/pkg/metrics"
 )
 
-const schema = "auth"
+const (
+	schema = "auth"
+
+	maxInterests      = 32
+	maxInterestLength = 64
+)
 
 var usernamePattern = regexp.MustCompile(`^[A-Za-z0-9_]{3,32}$`)
 
@@ -35,9 +42,11 @@ var authMigrations = []string{
 		password_hash TEXT NOT NULL,
 		email TEXT NOT NULL,
 		is_admin BOOLEAN NOT NULL DEFAULT false,
+		interests TEXT[] NOT NULL DEFAULT '{}',
 		created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 	)`,
 	`ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT false`,
+	`ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS interests TEXT[] NOT NULL DEFAULT '{}'`,
 }
 
 type server struct {
@@ -91,9 +100,10 @@ func (s *server) registerRoutes(router *bariohttp.Router) {
 }
 
 type registerRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-	Email    string `json:"email"`
+	Username  string   `json:"username"`
+	Password  string   `json:"password"`
+	Email     string   `json:"email"`
+	Interests []string `json:"interests"`
 }
 
 func (s *server) handleRegister(w http.ResponseWriter, r *http.Request) {
@@ -117,6 +127,22 @@ func (s *server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		bariohttp.WriteError(w, http.StatusBadRequest, "a valid email address is required")
 		return
 	}
+	if len(req.Interests) > maxInterests {
+		bariohttp.WriteError(w, http.StatusBadRequest, "interests must contain at most 32 tags")
+		return
+	}
+	interests := make([]string, 0, len(req.Interests))
+	for _, raw := range req.Interests {
+		tag := strings.TrimSpace(raw)
+		if tag == "" {
+			continue
+		}
+		if utf8.RuneCountInString(tag) > maxInterestLength {
+			bariohttp.WriteError(w, http.StatusBadRequest, "each interest must be at most 64 characters")
+			return
+		}
+		interests = append(interests, tag)
+	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
@@ -129,8 +155,9 @@ func (s *server) handleRegister(w http.ResponseWriter, r *http.Request) {
 
 	var id int64
 	err = s.db.QueryRowContext(r.Context(),
-		`INSERT INTO auth.users (username, password_hash, email, is_admin) VALUES ($1, $2, $3, $4) RETURNING id`,
-		username, string(hash), email, isAdmin,
+		`INSERT INTO auth.users (username, password_hash, email, is_admin, interests)
+		 VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+		username, string(hash), email, isAdmin, pq.Array(interests),
 	).Scan(&id)
 	if err != nil {
 		if db.IsUniqueViolation(err) {
@@ -143,9 +170,10 @@ func (s *server) handleRegister(w http.ResponseWriter, r *http.Request) {
 	}
 
 	bariohttp.WriteJSON(w, http.StatusCreated, map[string]any{
-		"id":       id,
-		"username": username,
-		"is_admin": isAdmin,
+		"id":        id,
+		"username":  username,
+		"is_admin":  isAdmin,
+		"interests": interests,
 	})
 }
 
@@ -162,14 +190,15 @@ func (s *server) handleLogin(w http.ResponseWriter, r *http.Request) {
 
 	username := strings.TrimSpace(req.Username)
 	var (
-		id       int64
-		hash     string
-		storedAs string
-		isAdmin  bool
+		id        int64
+		hash      string
+		storedAs  string
+		isAdmin   bool
+		interests []string
 	)
 	err := s.db.QueryRowContext(r.Context(),
-		`SELECT id, username, password_hash, is_admin FROM auth.users WHERE username = $1`, username,
-	).Scan(&id, &storedAs, &hash, &isAdmin)
+		`SELECT id, username, password_hash, is_admin, interests FROM auth.users WHERE username = $1`, username,
+	).Scan(&id, &storedAs, &hash, &isAdmin, pq.Array(&interests))
 	if errors.Is(err, sql.ErrNoRows) {
 		bariohttp.WriteError(w, http.StatusUnauthorized, "invalid username or password")
 		return
@@ -192,9 +221,18 @@ func (s *server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if interests == nil {
+		interests = []string{}
+	}
+
 	bariohttp.WriteJSON(w, http.StatusOK, map[string]any{
 		"token": token,
-		"user":  map[string]any{"id": id, "username": storedAs, "is_admin": isAdmin},
+		"user": map[string]any{
+			"id":        id,
+			"username":  storedAs,
+			"is_admin":  isAdmin,
+			"interests": interests,
+		},
 	})
 }
 
@@ -207,11 +245,12 @@ func (s *server) handleGetUser(w http.ResponseWriter, r *http.Request) {
 	var (
 		username  string
 		isAdmin   bool
+		interests []string
 		createdAt time.Time
 	)
 	err := s.db.QueryRowContext(r.Context(),
-		`SELECT username, is_admin, created_at FROM auth.users WHERE id = $1`, id,
-	).Scan(&username, &isAdmin, &createdAt)
+		`SELECT username, is_admin, interests, created_at FROM auth.users WHERE id = $1`, id,
+	).Scan(&username, &isAdmin, pq.Array(&interests), &createdAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		bariohttp.WriteError(w, http.StatusNotFound, "user not found")
 		return
@@ -222,10 +261,15 @@ func (s *server) handleGetUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if interests == nil {
+		interests = []string{}
+	}
+
 	bariohttp.WriteJSON(w, http.StatusOK, map[string]any{
 		"id":         id,
 		"username":   username,
 		"is_admin":   isAdmin,
+		"interests":  interests,
 		"created_at": createdAt,
 	})
 }

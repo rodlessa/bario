@@ -18,6 +18,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"os/exec"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -102,15 +103,17 @@ func startTestPostgres() (string, string, error) {
 }
 
 type registerResponse struct {
-	ID       int64  `json:"id"`
-	Username string `json:"username"`
-	IsAdmin  bool   `json:"is_admin"`
+	ID        int64    `json:"id"`
+	Username  string   `json:"username"`
+	IsAdmin   bool     `json:"is_admin"`
+	Interests []string `json:"interests"`
 }
 
 type userResponse struct {
 	ID        int64     `json:"id"`
 	Username  string    `json:"username"`
 	IsAdmin   bool      `json:"is_admin"`
+	Interests []string  `json:"interests"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
@@ -153,6 +156,15 @@ func credentials(username, password, email string) map[string]string {
 		"username": username,
 		"password": password,
 		"email":    email,
+	}
+}
+
+func credentialsWithInterests(username, password, email string, interests []string) map[string]any {
+	return map[string]any{
+		"username":  username,
+		"password":  password,
+		"email":     email,
+		"interests": interests,
 	}
 }
 
@@ -233,6 +245,16 @@ func registerUser(t *testing.T, handler http.Handler, username, password, email 
 	return decodeResponse[registerResponse](t, recorder)
 }
 
+func registerUserWithInterests(t *testing.T, handler http.Handler, username, password, email string, interests []string) registerResponse {
+	t.Helper()
+	recorder := requestJSON(t, handler, http.MethodPost, "/register",
+		credentialsWithInterests(username, password, email, interests))
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("register %q: status = %d; body = %s", username, recorder.Code, recorder.Body.String())
+	}
+	return decodeResponse[registerResponse](t, recorder)
+}
+
 func loginUser(t *testing.T, handler http.Handler, username, password string) loginResponse {
 	t.Helper()
 	recorder := requestJSON(t, handler, http.MethodPost, "/login", loginBody(username, password))
@@ -251,7 +273,7 @@ func TestRegisterSuccess(t *testing.T) {
 		t.Fatalf("status = %d, want %d; body = %s", recorder.Code, http.StatusCreated, recorder.Body.String())
 	}
 
-	assertJSONKeys(t, recorder, "id", "username", "is_admin")
+	assertJSONKeys(t, recorder, "id", "username", "is_admin", "interests")
 	got := decodeResponse[registerResponse](t, recorder)
 	if got.ID <= 0 {
 		t.Fatalf("id = %d, want positive", got.ID)
@@ -261,6 +283,16 @@ func TestRegisterSuccess(t *testing.T) {
 	}
 	if got.IsAdmin {
 		t.Fatal("non-reserved username was marked admin")
+	}
+	if got.Interests == nil || len(got.Interests) != 0 {
+		t.Fatalf("interests = %v, want []", got.Interests)
+	}
+	var payload map[string]json.RawMessage
+	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if string(payload["interests"]) != "[]" {
+		t.Fatalf("interests JSON = %s, want []", payload["interests"])
 	}
 
 	var hash string
@@ -446,10 +478,13 @@ func TestLoginSuccess(t *testing.T) {
 	if err := json.Unmarshal(payload["user"], &userObject); err != nil {
 		t.Fatalf("decode login user: %v", err)
 	}
-	for _, key := range []string{"id", "username", "is_admin"} {
+	for _, key := range []string{"id", "username", "is_admin", "interests"} {
 		if _, ok := userObject[key]; !ok {
 			t.Fatalf("login user is missing key %q: %s", key, recorder.Body.String())
 		}
+	}
+	if string(userObject["interests"]) != "[]" {
+		t.Fatalf("login interests JSON = %s, want []", userObject["interests"])
 	}
 
 	got := decodeResponse[loginResponse](t, recorder)
@@ -464,6 +499,9 @@ func TestLoginSuccess(t *testing.T) {
 	}
 	if got.User.IsAdmin {
 		t.Fatal("non-admin login returned is_admin=true")
+	}
+	if got.User.Interests == nil || len(got.User.Interests) != 0 {
+		t.Fatalf("login interests = %v, want []", got.User.Interests)
 	}
 }
 
@@ -516,7 +554,7 @@ func TestGetUserSuccess(t *testing.T) {
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d; body = %s", recorder.Code, http.StatusOK, recorder.Body.String())
 	}
-	assertJSONKeys(t, recorder, "id", "username", "is_admin", "created_at")
+	assertJSONKeys(t, recorder, "id", "username", "is_admin", "interests", "created_at")
 
 	got := decodeResponse[userResponse](t, recorder)
 	if got.ID != user.ID || got.Username != "ada" {
@@ -525,8 +563,18 @@ func TestGetUserSuccess(t *testing.T) {
 	if got.IsAdmin {
 		t.Fatal("non-admin user returned is_admin=true")
 	}
+	if got.Interests == nil || len(got.Interests) != 0 {
+		t.Fatalf("interests = %v, want []", got.Interests)
+	}
 	if got.CreatedAt.IsZero() {
 		t.Fatal("created_at is zero")
+	}
+	var payload map[string]json.RawMessage
+	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if string(payload["interests"]) != "[]" {
+		t.Fatalf("interests JSON = %s, want []", payload["interests"])
 	}
 }
 
@@ -556,5 +604,117 @@ func TestGetUserIsAdmin(t *testing.T) {
 	}
 	if got := decodeResponse[userResponse](t, userRecorder); got.IsAdmin {
 		t.Fatal("normal profile returned is_admin=true")
+	}
+}
+
+func TestRegisterWithInterests(t *testing.T) {
+	handler, _ := newTestAuth(t)
+	interests := []string{"technology", "music", "travel"}
+
+	recorder := requestJSON(t, handler, http.MethodPost, "/register",
+		credentialsWithInterests("ada", testPassword, "ada@example.com", interests))
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d; body = %s", recorder.Code, http.StatusCreated, recorder.Body.String())
+	}
+	assertJSONKeys(t, recorder, "id", "username", "is_admin", "interests")
+
+	got := decodeResponse[registerResponse](t, recorder)
+	if !slices.Equal(got.Interests, interests) {
+		t.Fatalf("interests = %v, want %v", got.Interests, interests)
+	}
+}
+
+func TestRegisterWithoutInterestsDefaultsToEmpty(t *testing.T) {
+	handler, _ := newTestAuth(t)
+	cases := []struct {
+		name     string
+		username string
+		body     any
+	}{
+		{
+			name:     "omitted",
+			username: "omitted",
+			body:     credentials("omitted", testPassword, "omitted@example.com"),
+		},
+		{
+			name:     "explicit_empty",
+			username: "empty",
+			body:     credentialsWithInterests("empty", testPassword, "empty@example.com", []string{}),
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			recorder := requestJSON(t, handler, http.MethodPost, "/register", tc.body)
+			if recorder.Code != http.StatusCreated {
+				t.Fatalf("status = %d, want %d; body = %s", recorder.Code, http.StatusCreated, recorder.Body.String())
+			}
+			assertJSONKeys(t, recorder, "id", "username", "is_admin", "interests")
+			got := decodeResponse[registerResponse](t, recorder)
+			if got.Interests == nil || len(got.Interests) != 0 {
+				t.Fatalf("interests = %v, want []", got.Interests)
+			}
+			var payload map[string]json.RawMessage
+			if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
+				t.Fatalf("decode response: %v", err)
+			}
+			if string(payload["interests"]) != "[]" {
+				t.Fatalf("interests JSON = %s, want []", payload["interests"])
+			}
+		})
+	}
+}
+
+func TestRegisterTooManyInterests(t *testing.T) {
+	handler, _ := newTestAuth(t)
+	interests := make([]string, maxInterests+1)
+	for i := range interests {
+		interests[i] = fmt.Sprintf("tag-%02d", i)
+	}
+
+	recorder := requestJSON(t, handler, http.MethodPost, "/register",
+		credentialsWithInterests("ada", testPassword, "ada@example.com", interests))
+	assertError(t, recorder, http.StatusBadRequest, "interests must contain at most 32 tags")
+
+	var count int
+	if err := testPool.QueryRowContext(context.Background(), `SELECT count(*) FROM auth.users`).Scan(&count); err != nil {
+		t.Fatalf("count users: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("created %d user(s) with too many interests", count)
+	}
+}
+
+func TestRegisterInterestTooLong(t *testing.T) {
+	handler, _ := newTestAuth(t)
+	interests := []string{strings.Repeat("x", maxInterestLength+1)}
+
+	recorder := requestJSON(t, handler, http.MethodPost, "/register",
+		credentialsWithInterests("ada", testPassword, "ada@example.com", interests))
+	assertError(t, recorder, http.StatusBadRequest, "each interest must be at most 64 characters")
+}
+
+func TestLoginReturnsInterests(t *testing.T) {
+	handler, _ := newTestAuth(t)
+	interests := []string{"technology", "music"}
+	registerUserWithInterests(t, handler, "ada", testPassword, "ada@example.com", interests)
+
+	login := loginUser(t, handler, "ada", testPassword)
+	if !slices.Equal(login.User.Interests, interests) {
+		t.Fatalf("login interests = %v, want %v", login.User.Interests, interests)
+	}
+}
+
+func TestGetUserReturnsInterests(t *testing.T) {
+	handler, _ := newTestAuth(t)
+	interests := []string{"technology", "music"}
+	user := registerUserWithInterests(t, handler, "ada", testPassword, "ada@example.com", interests)
+
+	recorder := requestRaw(t, handler, http.MethodGet, fmt.Sprintf("/users/%d", user.ID), "")
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body = %s", recorder.Code, http.StatusOK, recorder.Body.String())
+	}
+	got := decodeResponse[userResponse](t, recorder)
+	if !slices.Equal(got.Interests, interests) {
+		t.Fatalf("interests = %v, want %v", got.Interests, interests)
 	}
 }
