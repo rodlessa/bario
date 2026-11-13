@@ -18,6 +18,8 @@ spec:
       labels:
         {{- include "bario.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: frontend
+      annotations:
+        bario.dev/revision: {{ .Release.Revision | quote }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:

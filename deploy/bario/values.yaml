@@ -13,13 +13,18 @@ imagePullSecrets: []
 # One entry per workload service. Most Go services expose :8080 (API) and
 # :9090 (metrics); ads uses :8087/:9097 and the moderation sidecars use their
 # own ports (8085/9095 and 8086/9096) as defined in their templates.
+#
+# Images use :latest with pullPolicy Always, and the app pod templates carry a
+# bario.dev/revision={{ .Release.Revision }} annotation. That makes every helm
+# upgrade roll the app pods and pull the current image even when only the image
+# contents changed (no manual immutable-tag dance).
 services:
   auth:
     replicas: 1
     image:
       repository: bario/auth
       tag: latest
-      pullPolicy: IfNotPresent
+      pullPolicy: Always
     # Optional scheduling constraints; empty keeps the scheduler defaults.
     nodeSelector: {}
     affinity: {}
@@ -36,7 +41,7 @@ services:
     image:
       repository: bario/posts
       tag: latest
-      pullPolicy: IfNotPresent
+      pullPolicy: Always
     # Optional scheduling constraints; empty keeps the scheduler defaults.
     nodeSelector: {}
     affinity: {}
@@ -53,7 +58,7 @@ services:
     image:
       repository: bario/uploads
       tag: latest
-      pullPolicy: IfNotPresent
+      pullPolicy: Always
     # Optional scheduling constraints; empty keeps the scheduler defaults.
     nodeSelector: {}
     affinity: {}
@@ -70,7 +75,7 @@ services:
     image:
       repository: bario/follows
       tag: latest
-      pullPolicy: IfNotPresent
+      pullPolicy: Always
     # Optional scheduling constraints; empty keeps the scheduler defaults.
     nodeSelector: {}
     affinity: {}
@@ -87,7 +92,7 @@ services:
     image:
       repository: bario/ads
       tag: latest
-      pullPolicy: IfNotPresent
+      pullPolicy: Always
     # Optional scheduling constraints; empty keeps the scheduler defaults.
     nodeSelector: {}
     affinity: {}
@@ -104,7 +109,7 @@ services:
     image:
       repository: bario/moderation
       tag: latest
-      pullPolicy: IfNotPresent
+      pullPolicy: Always
     # Heavy service: on the Orange Pi cluster pin this to the master, e.g.
     # nodeSelector {node-type: heavy} plus a toleration for the control-plane taint.
     # Optional scheduling constraints; empty keeps the scheduler defaults.
@@ -125,7 +130,7 @@ services:
     image:
       repository: bario/moderation-gore
       tag: latest
-      pullPolicy: IfNotPresent
+      pullPolicy: Always
     # Heavy service: on the Orange Pi cluster pin this to the master, e.g.
     # nodeSelector {node-type: heavy} plus a toleration for the control-plane taint.
     # Optional scheduling constraints; empty keeps the scheduler defaults.
@@ -147,7 +152,7 @@ frontend:
   image:
     repository: bario/frontend
     tag: latest
-    pullPolicy: IfNotPresent
+    pullPolicy: Always
   # Optional scheduling constraints; empty keeps the scheduler defaults.
   nodeSelector: {}
   affinity: {}
@@ -272,7 +277,7 @@ grafana:
   image:
     repository: grafana/grafana
     tag: "11.3.0"
-    pullPolicy: IfNotPresent
+    pullPolicy: Always
   adminUser: admin
   # Leave empty to let the chart generate a random password on first install.
   # The generated value is stored in the Kubernetes Secret and reused on upgrade.
