@@ -358,6 +358,9 @@ hand. The admin password is generated into the `<release>-grafana` Secret:
 kubectl -n bario get secret bario-grafana -o jsonpath='{.data.admin-password}' | base64 -d
 ```
 
+Per-service and platform operations are documented in
+[`docs/runbooks/`](docs/runbooks/README.md).
+
 ## Frontend layouts
 
 The SPA has two presentations of the same components, switched in the header:
