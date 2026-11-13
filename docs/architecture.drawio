@@ -392,4 +392,659 @@
       </root>
     </mxGraphModel>
   </diagram>
+  <diagram id="bario-auth-001" name="auth service">
+    <mxGraphModel dx="1900" dy="1100" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1900" pageHeight="1100" math="0" shadow="0" adaptiveColors="auto">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="bario-auth-001-title" value="Bario — auth service (schema auth)" style="text;fontStyle=1;fontSize=16;html=1;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="40" y="10" width="1300" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="bario-auth-001-sub" value="Identity, JWT issuance, public profiles · no outbound clients" style="text;fontSize=12;html=1;fontColor=#5A626E;" vertex="1" parent="1">
+          <mxGeometry x="40" y="40" width="1300" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth-client" value="Browser / Traefik ingress&lt;br&gt;/api/auth" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="40" y="120" width="160" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth-svc" value="auth Deployment — Go · schema auth · API :8080 · metrics :9090" style="swimlane;startSize=26;fillColor=#F7F8FA;strokeColor=#D5DAE1;html=1;fontColor=#1B1F24;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="240" y="90" width="1180" height="700" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth-startup" value="startup: db.Connect → db.Migrate (auth.users) → jwt.Manager (24h) → routes → Serve" style="text;html=1;align=left;fontSize=11;fontColor=#5A626E;" vertex="1" parent="auth-svc">
+          <mxGeometry x="20" y="28" width="1120" height="18" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth-register" value="POST /register — handleRegister" style="swimlane;startSize=22;fillColor=#FFFFFF;strokeColor=#D5DAE1;html=1;fontColor=#1B1F24;fontStyle=1;" vertex="1" parent="auth-svc">
+          <mxGeometry x="20" y="50" width="1140" height="140" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth-r1" value="POST /register&lt;br&gt;/api/auth/register" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="auth-register">
+          <mxGeometry x="20" y="30" width="170" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth-r2" value="handleRegister&lt;br&gt;JSON decode" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="auth-register">
+          <mxGeometry x="210" y="30" width="160" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth-r3" value="validate&lt;br&gt;username ^[A-Za-z0-9_]{3,32}$&lt;br&gt;password 8–72 · email ≤254&lt;br&gt;interests ≤32 tags × 64 chars" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="auth-register">
+          <mxGeometry x="390" y="30" width="250" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth-r4" value="bcrypt.GenerateFromPassword&lt;br&gt;DefaultCost" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="auth-register">
+          <mxGeometry x="660" y="30" width="230" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth-r5" value="INSERT auth.users&lt;br&gt;RETURNING id&lt;br&gt;409 duplicate · 500 DB" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="auth-register">
+          <mxGeometry x="910" y="30" width="210" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth-e-r1" value="JSON" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="auth-register" source="auth-r1" target="auth-r2">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth-e-r2" value="validate" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="auth-register" source="auth-r2" target="auth-r3">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth-e-r3" value="valid" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="auth-register" source="auth-r3" target="auth-r4">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth-e-r4" value="hash" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="auth-register" source="auth-r4" target="auth-r5">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth-login" value="POST /login — handleLogin" style="swimlane;startSize=22;fillColor=#FFFFFF;strokeColor=#D5DAE1;html=1;fontColor=#1B1F24;fontStyle=1;" vertex="1" parent="auth-svc">
+          <mxGeometry x="20" y="210" width="1140" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth-l1" value="POST /login&lt;br&gt;/api/auth/login" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="auth-login">
+          <mxGeometry x="20" y="30" width="170" height="64" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth-l2" value="SELECT id, username, hash,&lt;br&gt;is_admin, interests&lt;br&gt;WHERE username=$1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="auth-login">
+          <mxGeometry x="210" y="30" width="210" height="64" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth-l3" value="bcrypt.CompareHashAndPassword&lt;br&gt;401 invalid username/password" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="auth-login">
+          <mxGeometry x="440" y="30" width="230" height="64" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth-l4" value="jwt.Issue&lt;br&gt;24h claims (id, username)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="auth-login">
+          <mxGeometry x="690" y="30" width="220" height="64" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth-l5" value="200 {token, user}&lt;br&gt;{id, username, is_admin,&lt;br&gt;interests}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="auth-login">
+          <mxGeometry x="930" y="30" width="190" height="64" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth-e-l1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="auth-login" source="auth-l1" target="auth-l2">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth-e-l2" value="row" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="auth-login" source="auth-l2" target="auth-l3">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth-e-l3" value="match" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="auth-login" source="auth-l3" target="auth-l4">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth-e-l4" value="token" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="auth-login" source="auth-l4" target="auth-l5">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth-get" value="GET /users/{id} — handleGetUser" style="swimlane;startSize=22;fillColor=#FFFFFF;strokeColor=#D5DAE1;html=1;fontColor=#1B1F24;fontStyle=1;" vertex="1" parent="auth-svc">
+          <mxGeometry x="20" y="350" width="1140" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth-g1" value="GET /users/{id}&lt;br&gt;/api/auth/users/{id}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="auth-get">
+          <mxGeometry x="20" y="30" width="190" height="64" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth-g2" value="parseID&lt;br&gt;400 invalid" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="auth-get">
+          <mxGeometry x="230" y="30" width="140" height="64" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth-g3" value="SELECT username, is_admin,&lt;br&gt;interests, created_at&lt;br&gt;404 not found · 500 DB" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="auth-get">
+          <mxGeometry x="390" y="30" width="300" height="64" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth-g4" value="200 public profile&lt;br&gt;{id, username, is_admin,&lt;br&gt;interests, created_at}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="auth-get">
+          <mxGeometry x="710" y="30" width="220" height="64" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth-e-g1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="auth-get" source="auth-g1" target="auth-g2">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth-e-g2" value="id" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="auth-get" source="auth-g2" target="auth-g3">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth-e-g3" value="user" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="auth-get" source="auth-g3" target="auth-g4">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth-semantics" value="&lt;b&gt;Auth semantics&lt;/b&gt;&lt;br&gt;JWT TTL 24h, signed with shared JWT_SECRET. Admin flag is assigned when username == ADMIN_USERNAME (default admin).&lt;br&gt;No outbound HTTP clients: auth only reads/writes auth.users. Other services call auth for usernames/interests; uploads validates JWTs locally." style="rounded=1;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=10;spacingTop=6;fillColor=#FFFFFF;strokeColor=#D5DAE1;fontColor=#1B1F24;" vertex="1" parent="auth-svc">
+          <mxGeometry x="20" y="490" width="1140" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth-deps" value="&lt;b&gt;Called by&lt;/b&gt;&lt;br&gt;posts: author usernames · follows: follower/following names · ads: caller interests · frontend: register/login/profile" style="rounded=1;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=10;spacingTop=6;fillColor=#FFFFFF;strokeColor=#D5DAE1;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="1460" y="90" width="420" height="150" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth-pg" value="PostgreSQL 16 · schema auth" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#F3EEFF;strokeColor=#B9A6F0;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="1460" y="260" width="420" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth-table" value="&lt;b&gt;auth.users&lt;/b&gt;&lt;br&gt;id BIGSERIAL PK&lt;br&gt;username TEXT NOT NULL UNIQUE&lt;br&gt;password_hash TEXT NOT NULL&lt;br&gt;email TEXT NOT NULL&lt;br&gt;is_admin BOOLEAN NOT NULL DEFAULT false&lt;br&gt;interests TEXT[] NOT NULL DEFAULT &#x27;{}&#x27;&lt;br&gt;created_at TIMESTAMPTZ NOT NULL DEFAULT now()" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#FCFBFF;strokeColor=#B9A6F0;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="1460" y="355" width="420" height="240" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth-noout" value="No outbound client calls.&lt;br&gt;JWT is validated locally by every service with the shared secret; posts/follows/ads still call auth over HTTP for names/interests." style="rounded=1;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=10;spacingTop=6;fillColor=#FFFFFF;strokeColor=#D5DAE1;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="1460" y="610" width="420" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth-e-client" value="/api/auth" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="1" source="auth-client" target="auth-svc">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth-e-db" value="READ / WRITE auth.users" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#B9A6F0;fontColor=#6B51A8;" edge="1" parent="1" source="auth-svc" target="auth-pg">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth-fail" value="&lt;b&gt;Failure / degradation matrix&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;font color=#B42318&gt;&lt;b&gt;DB failure&lt;/b&gt;&lt;/font&gt; → 500 could not create account / could not sign in / could not load user&lt;br&gt;&lt;font color=#B42318&gt;&lt;b&gt;duplicate username&lt;/b&gt;&lt;/font&gt; → 409 username is already taken&lt;br&gt;&lt;font color=#B42318&gt;&lt;b&gt;bad input&lt;/b&gt;&lt;/font&gt; → 400 (username regex, password 8–72, email, interests)&lt;br&gt;&lt;font color=#B42318&gt;&lt;b&gt;bad credentials&lt;/b&gt;&lt;/font&gt; → 401 invalid username or password (same response for unknown user and wrong password)&lt;br&gt;startup: DATABASE_URL / JWT_SECRET / ADMIN_USERNAME / HTTP_PORT / METRICS_PORT; migrations run automatically." style="rounded=1;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=10;spacingTop=6;fillColor=#FFFFFF;strokeColor=#D5DAE1;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="40" y="810" width="900" height="250" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth-contract" value="&lt;b&gt;Contract&lt;/b&gt;&lt;br&gt;&lt;br&gt;POST /register → 201 {id, username, is_admin, interests}&lt;br&gt;POST /login → 200 {token, user}&lt;br&gt;GET /users/{id} → 200 public profile · 404 · 400&lt;br&gt;&lt;br&gt;Every route is mounted both bare and under /api/auth. Metrics: service=auth, endpoints health/register/login/get_user." style="rounded=1;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=10;spacingTop=6;fillColor=#FFFFFF;strokeColor=#D5DAE1;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="960" y="810" width="460" height="250" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth-legend" value="&lt;b&gt;Legend&lt;/b&gt;&lt;br&gt;solid blue = sync HTTP / DB call&lt;br&gt;&lt;font color=#B42318&gt;red dashed = load-bearing failure (abort)&lt;/font&gt;&lt;br&gt;&lt;font color=#2E7D32&gt;green dashed = graceful degradation / fail-open&lt;/font&gt;&lt;br&gt;&lt;font color=#5A626E&gt;gray dashed = metrics scrape&lt;/font&gt;&lt;br&gt;purple = PostgreSQL / persistent storage&lt;br&gt;&lt;br&gt;&lt;b&gt;Runtime&lt;/b&gt;&lt;br&gt;HTTP :8080 · metrics :9090 (ClusterIP)" style="rounded=1;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=10;spacingTop=6;fillColor=#FFF9DB;strokeColor=#E9D58A;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="1440" y="810" width="420" height="250" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="bario-follows-001" name="follows service">
+    <mxGraphModel dx="1900" dy="1100" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1900" pageHeight="1100" math="0" shadow="0" adaptiveColors="auto">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="bario-follows-001-title" value="Bario — follows service (schema follows)" style="text;fontStyle=1;fontSize=16;html=1;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="40" y="10" width="1300" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="bario-follows-001-sub" value="Directed follower graph · idempotent follow/unfollow · best-effort usernames" style="text;fontSize=12;html=1;fontColor=#5A626E;" vertex="1" parent="1">
+          <mxGeometry x="40" y="40" width="1300" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="follows-client" value="Browser / Traefik ingress&lt;br&gt;/api/follows" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="40" y="120" width="160" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="follows-svc" value="follows Deployment — Go · schema follows · API :8080 · metrics :9090" style="swimlane;startSize=26;fillColor=#F7F8FA;strokeColor=#D5DAE1;html=1;fontColor=#1B1F24;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="240" y="90" width="1180" height="700" as="geometry"/>
+        </mxCell>
+        <mxCell id="follows-startup" value="startup: db.Connect → db.Migrate (follows.follows) → jwt.Manager → authclient (AUTH_URL) → Serve" style="text;html=1;align=left;fontSize=11;fontColor=#5A626E;" vertex="1" parent="follows-svc">
+          <mxGeometry x="20" y="28" width="1120" height="18" as="geometry"/>
+        </mxCell>
+        <mxCell id="follows-mut" value="POST / DELETE /users/{id}/follow — mutate graph" style="swimlane;startSize=22;fillColor=#FFFFFF;strokeColor=#D5DAE1;html=1;fontColor=#1B1F24;fontStyle=1;" vertex="1" parent="follows-svc">
+          <mxGeometry x="20" y="50" width="1140" height="190" as="geometry"/>
+        </mxCell>
+        <mxCell id="follows-m1" value="POST /users/{id}/follow&lt;br&gt;DELETE /users/{id}/follow&lt;br&gt;/api/follows/...&lt;br&gt;RequireAuth" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="follows-mut">
+          <mxGeometry x="20" y="30" width="220" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="follows-m2" value="parseID&lt;br&gt;400 invalid" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="follows-mut">
+          <mxGeometry x="260" y="30" width="150" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="follows-m3" value="self-follow?&lt;br&gt;400 you cannot&lt;br&gt;follow yourself" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="follows-mut">
+          <mxGeometry x="430" y="30" width="180" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="follows-m4" value="INSERT ... ON CONFLICT DO NOTHING&lt;br&gt;or DELETE WHERE follower=$1&lt;br&gt;AND followee=$2" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="follows-mut">
+          <mxGeometry x="630" y="30" width="330" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="follows-m5" value="201 {following:true}&lt;br&gt;204 unfollow&lt;br&gt;500 on DB error" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="follows-mut">
+          <mxGeometry x="980" y="30" width="140" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="follows-e-m1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="follows-mut" source="follows-m1" target="follows-m2">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="follows-e-m2" value="id" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="follows-mut" source="follows-m2" target="follows-m3">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="follows-e-m3" value="ok" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="follows-mut" source="follows-m3" target="follows-m4">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="follows-e-m4" value="done" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="follows-mut" source="follows-m4" target="follows-m5">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="follows-list" value="GET /users/{id}/followers · /following — public lists" style="swimlane;startSize=22;fillColor=#FFFFFF;strokeColor=#D5DAE1;html=1;fontColor=#1B1F24;fontStyle=1;" vertex="1" parent="follows-svc">
+          <mxGeometry x="20" y="260" width="1140" height="170" as="geometry"/>
+        </mxCell>
+        <mxCell id="follows-l1" value="GET /users/{id}/followers&lt;br&gt;GET /users/{id}/following&lt;br&gt;(bare and /api/follows)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="follows-list">
+          <mxGeometry x="20" y="30" width="250" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="follows-l2" value="parseID&lt;br&gt;400 invalid" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="follows-list">
+          <mxGeometry x="290" y="30" width="150" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="follows-l3" value="SELECT follower_id / followee_id&lt;br&gt;ORDER BY created_at DESC,&lt;br&gt;id DESC&lt;br&gt;no pagination" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="follows-list">
+          <mxGeometry x="460" y="30" width="300" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="follows-l4" value="authClient.Username&lt;br&gt;per id (best-effort)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="follows-list">
+          <mxGeometry x="780" y="30" width="210" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="follows-l5" value="200 [{id,username}]&lt;br&gt;500 on DB error" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="follows-list">
+          <mxGeometry x="1010" y="30" width="110" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="follows-e-l1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="follows-list" source="follows-l1" target="follows-l2">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="follows-e-l2" value="id" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="follows-list" source="follows-l2" target="follows-l3">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="follows-e-l3" value="ids" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="follows-list" source="follows-l3" target="follows-l4">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="follows-e-l4" value="names" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="follows-list" source="follows-l4" target="follows-l5">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="follows-note" value="&lt;b&gt;Graph semantics&lt;/b&gt;&lt;br&gt;Primary key (follower_id, followee_id) makes follow idempotent. Unfollow of a missing edge is still 204. Lists return every relation (no cursor/limit); clients should not assume a bound. Username lookup failure degrades to user-&amp;lt;id&gt;, it does not fail the list." style="rounded=1;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=10;spacingTop=6;fillColor=#FFFFFF;strokeColor=#D5DAE1;fontColor=#1B1F24;" vertex="1" parent="follows-svc">
+          <mxGeometry x="20" y="470" width="1140" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="follows-auth" value="auth service · :8080&lt;br&gt;GET /users/{id}&lt;br&gt;&lt;font color=#2E7D32&gt;best-effort: error → user-&amp;lt;id&gt;&lt;/font&gt;&lt;br&gt;list still returns 200" style="rounded=1;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=10;spacingTop=6;fillColor=#FFFFFF;strokeColor=#D5DAE1;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="1460" y="90" width="420" height="160" as="geometry"/>
+        </mxCell>
+        <mxCell id="follows-pg" value="PostgreSQL 16 · schema follows" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#F3EEFF;strokeColor=#B9A6F0;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="1460" y="270" width="420" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="follows-table" value="&lt;b&gt;follows.follows&lt;/b&gt;&lt;br&gt;follower_id BIGINT NOT NULL&lt;br&gt;followee_id BIGINT NOT NULL&lt;br&gt;created_at TIMESTAMPTZ NOT NULL DEFAULT now()&lt;br&gt;PRIMARY KEY (follower_id, followee_id)&lt;br&gt;index follows_followee_id_idx (followee_id)" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#FCFBFF;strokeColor=#B9A6F0;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="1460" y="365" width="420" height="220" as="geometry"/>
+        </mxCell>
+        <mxCell id="follows-callers" value="&lt;b&gt;Callers&lt;/b&gt;&lt;br&gt;posts feed: GET /users/{id}/following&lt;br&gt;the post service treats a follows error as load-bearing (502)." style="rounded=1;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=10;spacingTop=6;fillColor=#FFFFFF;strokeColor=#D5DAE1;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="1460" y="610" width="420" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="follows-e-client" value="/api/follows" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="1" source="follows-client" target="follows-svc">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="follows-e-auth" value="Username (best-effort)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;strokeColor=#2E7D32;fontColor=#2E7D32;" edge="1" parent="1" source="follows-svc" target="follows-auth">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="follows-e-db" value="READ / WRITE follows.follows" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#B9A6F0;fontColor=#6B51A8;" edge="1" parent="1" source="follows-svc" target="follows-pg">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="follows-fail" value="&lt;b&gt;Failure / degradation matrix&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;font color=#B42318&gt;&lt;b&gt;DB error&lt;/b&gt;&lt;/font&gt; → 500 could not follow user / could not unfollow user / could not load users&lt;br&gt;&lt;font color=#B42318&gt;&lt;b&gt;self-follow&lt;/b&gt;&lt;/font&gt; → 400 you cannot follow yourself&lt;br&gt;&lt;font color=#B42318&gt;&lt;b&gt;bad id&lt;/b&gt;&lt;/font&gt; → 400 invalid id&lt;br&gt;&lt;font color=#2E7D32&gt;&lt;b&gt;auth username lookup down&lt;/b&gt;&lt;/font&gt; → names become user-&amp;lt;id&gt;; list still 200&lt;br&gt;follow errors are load-bearing only for posts&#x27; feed: posts returns 502 if FollowingIDs fails." style="rounded=1;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=10;spacingTop=6;fillColor=#FFFFFF;strokeColor=#D5DAE1;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="40" y="810" width="900" height="250" as="geometry"/>
+        </mxCell>
+        <mxCell id="follows-contract" value="&lt;b&gt;Contract&lt;/b&gt;&lt;br&gt;&lt;br&gt;POST /users/{id}/follow → 201 {following:true}&lt;br&gt;DELETE /users/{id}/follow → 204&lt;br&gt;GET /users/{id}/followers · /following → 200 [{id,username}]&lt;br&gt;&lt;br&gt;Mutations require JWT; lists are public. Metrics: service=follows, endpoints health/follow_user/unfollow_user/list_followers/list_following." style="rounded=1;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=10;spacingTop=6;fillColor=#FFFFFF;strokeColor=#D5DAE1;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="960" y="810" width="460" height="250" as="geometry"/>
+        </mxCell>
+        <mxCell id="follows-legend" value="&lt;b&gt;Legend&lt;/b&gt;&lt;br&gt;solid blue = sync HTTP / DB call&lt;br&gt;&lt;font color=#B42318&gt;red dashed = load-bearing failure (abort)&lt;/font&gt;&lt;br&gt;&lt;font color=#2E7D32&gt;green dashed = graceful degradation / fail-open&lt;/font&gt;&lt;br&gt;&lt;font color=#5A626E&gt;gray dashed = metrics scrape&lt;/font&gt;&lt;br&gt;purple = PostgreSQL / persistent storage&lt;br&gt;&lt;br&gt;&lt;b&gt;Runtime&lt;/b&gt;&lt;br&gt;HTTP :8080 · metrics :9090 (ClusterIP)" style="rounded=1;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=10;spacingTop=6;fillColor=#FFF9DB;strokeColor=#E9D58A;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="1440" y="810" width="420" height="250" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="bario-ads-001" name="ads service">
+    <mxGraphModel dx="1900" dy="1100" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1900" pageHeight="1100" math="0" shadow="0" adaptiveColors="auto">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="bario-ads-001-title" value="Bario — ads service (schema ads)" style="text;fontStyle=1;fontSize=16;html=1;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="40" y="10" width="1300" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="bario-ads-001-sub" value="Campaign CRUD, scroll-scaled serving, impressions/clicks · fail-open to posts" style="text;fontSize=12;html=1;fontColor=#5A626E;" vertex="1" parent="1">
+          <mxGeometry x="40" y="40" width="1300" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="ads-client" value="Browser / feed / Traefik ingress&lt;br&gt;/api/ads" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="40" y="120" width="160" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="ads-svc" value="ads Deployment — Go · schema ads · API :8087 · metrics :9097" style="swimlane;startSize=26;fillColor=#F7F8FA;strokeColor=#D5DAE1;html=1;fontColor=#1B1F24;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="240" y="90" width="1180" height="700" as="geometry"/>
+        </mxCell>
+        <mxCell id="ads-startup" value="startup: db.Connect → db.Migrate (ads schema) → jwt.Manager → authclient (AUTH_URL) → Serve :8087 / :9097" style="text;html=1;align=left;fontSize=11;fontColor=#5A626E;" vertex="1" parent="ads-svc">
+          <mxGeometry x="20" y="28" width="1120" height="18" as="geometry"/>
+        </mxCell>
+        <mxCell id="ads-crud" value="POST /ads · GET /ads · PATCH /ads/{id}" style="swimlane;startSize=22;fillColor=#FFFFFF;strokeColor=#D5DAE1;html=1;fontColor=#1B1F24;fontStyle=1;" vertex="1" parent="ads-svc">
+          <mxGeometry x="20" y="50" width="1140" height="170" as="geometry"/>
+        </mxCell>
+        <mxCell id="ads-c1" value="POST /ads · GET /ads&lt;br&gt;PATCH /ads/{id}&lt;br&gt;RequireAuth" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="ads-crud">
+          <mxGeometry x="20" y="30" width="210" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="ads-c2" value="validate&lt;br&gt;create: title 1–120, body 1–2000,&lt;br&gt;budget ≥0; update: active|paused" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="ads-crud">
+          <mxGeometry x="250" y="30" width="300" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="ads-c3" value="INSERT advertisement&lt;br&gt;SELECT caller-owned ads&lt;br&gt;UPDATE owner-only&lt;br&gt;500 DB error" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="ads-crud">
+          <mxGeometry x="570" y="30" width="300" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="ads-c4" value="201 created&lt;br&gt;200 list&lt;br&gt;200 updated · 404 not found/not owned" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="ads-crud">
+          <mxGeometry x="890" y="30" width="230" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="ads-e-c1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="ads-crud" source="ads-c1" target="ads-c2">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="ads-e-c2" value="valid" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="ads-crud" source="ads-c2" target="ads-c3">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="ads-e-c3" value="row(s)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="ads-crud" source="ads-c3" target="ads-c4">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="ads-serve" value="GET /ads/serve?pages=&amp;limit= — handleServeAds" style="swimlane;startSize=22;fillColor=#FFFFFF;strokeColor=#D5DAE1;html=1;fontColor=#1B1F24;fontStyle=1;" vertex="1" parent="ads-svc">
+          <mxGeometry x="20" y="240" width="1140" height="270" as="geometry"/>
+        </mxCell>
+        <mxCell id="ads-s1" value="GET /ads/serve&lt;br&gt;RequireAuth" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="ads-serve">
+          <mxGeometry x="20" y="30" width="190" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="ads-s2" value="ratio = min(0.30,&lt;br&gt;0.05 + 0.02 × pages)&lt;br&gt;ad_count = round(ratio × limit)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="ads-serve">
+          <mxGeometry x="230" y="30" width="240" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="ads-s3" value="authClient.User&lt;br&gt;caller interests" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="ads-serve">
+          <mxGeometry x="490" y="30" width="170" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="ads-s4" value="targeted: active AND&lt;br&gt;target_tags &amp;&amp; interests&lt;br&gt;ORDER BY id DESC" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="ads-serve">
+          <mxGeometry x="680" y="30" width="240" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="ads-s5" value="general fill: active AND&lt;br&gt;target_tags = &#x27;{}&#x27;&lt;br&gt;remaining slots" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="ads-serve">
+          <mxGeometry x="940" y="30" width="180" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="ads-e-s1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="ads-serve" source="ads-s1" target="ads-s2">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="ads-e-s2" value="count" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="ads-serve" source="ads-s2" target="ads-s3">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="ads-e-s3" value="interests" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="ads-serve" source="ads-s3" target="ads-s4">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="ads-e-s4" value="remaining" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="ads-serve" source="ads-s4" target="ads-s5">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="ads-s6" value="INSERT impressions&lt;br&gt;best-effort; failures logged" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="ads-serve">
+          <mxGeometry x="20" y="160" width="260" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="ads-s7" value="200 [{id, advertiser_id,&lt;br&gt;title, body}]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="ads-serve">
+          <mxGeometry x="300" y="160" width="250" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="ads-e-s5" value="each ad" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="ads-serve" source="ads-s5" target="ads-s6">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="ads-e-s6" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="ads-serve" source="ads-s6" target="ads-s7">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="ads-click" value="POST /ads/{id}/click — click tracking" style="swimlane;startSize=22;fillColor=#FFFFFF;strokeColor=#D5DAE1;html=1;fontColor=#1B1F24;fontStyle=1;" vertex="1" parent="ads-svc">
+          <mxGeometry x="20" y="530" width="1140" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="ads-k1" value="POST /ads/{id}/click&lt;br&gt;RequireAuth" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="ads-click">
+          <mxGeometry x="20" y="30" width="220" height="64" as="geometry"/>
+        </mxCell>
+        <mxCell id="ads-k2" value="INSERT clicks&lt;br&gt;WHERE EXISTS advertisement&lt;br&gt;404 if absent · 500 DB" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="ads-click">
+          <mxGeometry x="270" y="30" width="360" height="64" as="geometry"/>
+        </mxCell>
+        <mxCell id="ads-k3" value="204 · 404 · 500" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="ads-click">
+          <mxGeometry x="660" y="30" width="180" height="64" as="geometry"/>
+        </mxCell>
+        <mxCell id="ads-e-k1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="ads-click" source="ads-k1" target="ads-k2">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="ads-e-k2" value="recorded" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="ads-click" source="ads-k2" target="ads-k3">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="ads-note" value="&lt;b&gt;Serving semantics&lt;/b&gt;&lt;br&gt;Ads are re-rolled every request; inventory shortfall is not an error (returns what exists). Impressions are inserted per served ad, best-effort. This feeds posts&#x27; fail-open interleaving; posts does not treat ads as load-bearing." style="rounded=1;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=10;spacingTop=6;fillColor=#FFFFFF;strokeColor=#D5DAE1;fontColor=#1B1F24;" vertex="1" parent="ads-svc">
+          <mxGeometry x="20" y="680" width="1140" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="ads-auth" value="auth service · :8080&lt;br&gt;GET /users/{id} → interests&lt;br&gt;&lt;font color=#2E7D32&gt;best-effort: error → no interests,&lt;br&gt;general ads only&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=10;spacingTop=6;fillColor=#FFFFFF;strokeColor=#D5DAE1;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="1460" y="90" width="420" height="150" as="geometry"/>
+        </mxCell>
+        <mxCell id="ads-pg" value="PostgreSQL 16 · schema ads" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#F3EEFF;strokeColor=#B9A6F0;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="1460" y="260" width="420" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="ads-t1" value="&lt;b&gt;ads.advertisements&lt;/b&gt;&lt;br&gt;id BIGSERIAL PK · advertiser_id BIGINT&lt;br&gt;title TEXT · body TEXT&lt;br&gt;target_tags TEXT[] DEFAULT &#x27;{}&#x27;&lt;br&gt;budget_cents BIGINT CHECK ≥0&lt;br&gt;status TEXT DEFAULT &#x27;active&#x27;&lt;br&gt;created_at/updated_at TIMESTAMPTZ&lt;br&gt;index advertiser_id · index status" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#FCFBFF;strokeColor=#B9A6F0;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="1460" y="345" width="420" height="170" as="geometry"/>
+        </mxCell>
+        <mxCell id="ads-t2" value="&lt;b&gt;ads.impressions&lt;/b&gt;&lt;br&gt;id BIGSERIAL PK&lt;br&gt;ad_id BIGINT FK advertisements ON DELETE CASCADE&lt;br&gt;user_id BIGINT · served_at TIMESTAMPTZ DEFAULT now()&lt;br&gt;index ad_id · index user_id" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#FCFBFF;strokeColor=#B9A6F0;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="1460" y="525" width="420" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="ads-t3" value="&lt;b&gt;ads.clicks&lt;/b&gt;&lt;br&gt;id BIGSERIAL PK&lt;br&gt;ad_id BIGINT FK advertisements ON DELETE CASCADE&lt;br&gt;user_id BIGINT · clicked_at TIMESTAMPTZ DEFAULT now()&lt;br&gt;index ad_id · index user_id" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#FCFBFF;strokeColor=#B9A6F0;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="1460" y="655" width="420" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="ads-e-client" value="/api/ads" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="1" source="ads-client" target="ads-svc">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="ads-e-auth" value="interests (best-effort)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;strokeColor=#2E7D32;fontColor=#2E7D32;" edge="1" parent="1" source="ads-svc" target="ads-auth">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="ads-e-db" value="READ / WRITE ads.*" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#B9A6F0;fontColor=#6B51A8;" edge="1" parent="1" source="ads-svc" target="ads-pg">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="ads-fail" value="&lt;b&gt;Failure / degradation matrix&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;font color=#B42318&gt;&lt;b&gt;DB error&lt;/b&gt;&lt;/font&gt; → 500 could not create/update/load ads, could not record click&lt;br&gt;&lt;font color=#B42318&gt;&lt;b&gt;bad input&lt;/b&gt;&lt;/font&gt; → 400 invalid pages/limit/id, title/body/status/budget validation&lt;br&gt;&lt;font color=#2E7D32&gt;&lt;b&gt;auth interests lookup failure&lt;/b&gt;&lt;/font&gt; → warn + serve general ads only (no 5xx)&lt;br&gt;&lt;font color=#2E7D32&gt;&lt;b&gt;impression insert failure&lt;/b&gt;&lt;/font&gt; → logged only; serve response still 200&lt;br&gt;&lt;font color=#5A626E&gt;inventory shortfall&lt;/font&gt; → 200 with fewer ads than ad_count; never an error" style="rounded=1;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=10;spacingTop=6;fillColor=#FFFFFF;strokeColor=#D5DAE1;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="40" y="810" width="900" height="250" as="geometry"/>
+        </mxCell>
+        <mxCell id="ads-contract" value="&lt;b&gt;Contract&lt;/b&gt;&lt;br&gt;&lt;br&gt;POST /ads → 201 ad&lt;br&gt;GET /ads → 200 caller-owned ads&lt;br&gt;PATCH /ads/{id} → 200 · 404 if not owner/missing&lt;br&gt;GET /ads/serve?pages&amp;limit → 200 [{id, advertiser_id,title,body}]&lt;br&gt;POST /ads/{id}/click → 204 · 404&lt;br&gt;&lt;br&gt;Metrics: service=ads, endpoints create_ad/list_ads/update_ad/serve_ads/click_ad/health." style="rounded=1;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=10;spacingTop=6;fillColor=#FFFFFF;strokeColor=#D5DAE1;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="960" y="810" width="460" height="250" as="geometry"/>
+        </mxCell>
+        <mxCell id="ads-legend" value="&lt;b&gt;Legend&lt;/b&gt;&lt;br&gt;solid blue = sync HTTP / DB call&lt;br&gt;&lt;font color=#B42318&gt;red dashed = load-bearing failure (abort)&lt;/font&gt;&lt;br&gt;&lt;font color=#2E7D32&gt;green dashed = graceful degradation / fail-open&lt;/font&gt;&lt;br&gt;&lt;font color=#5A626E&gt;gray dashed = metrics scrape&lt;/font&gt;&lt;br&gt;purple = PostgreSQL / persistent storage&lt;br&gt;&lt;br&gt;&lt;b&gt;Runtime&lt;/b&gt;&lt;br&gt;HTTP :8087 · metrics :9097 (ClusterIP) · pages scales ads" style="rounded=1;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=10;spacingTop=6;fillColor=#FFF9DB;strokeColor=#E9D58A;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="1440" y="810" width="420" height="250" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="bario-uploads-001" name="uploads service">
+    <mxGraphModel dx="1900" dy="1100" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1900" pageHeight="1100" math="0" shadow="0" adaptiveColors="auto">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="bario-uploads-001-title" value="Bario — uploads service (schema uploads)" style="text;fontStyle=1;fontSize=16;html=1;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="40" y="10" width="1300" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="bario-uploads-001-sub" value="Image ingest, moderation fan-out, quarantine/audit, immutable image reads" style="text;fontSize=12;html=1;fontColor=#5A626E;" vertex="1" parent="1">
+          <mxGeometry x="40" y="40" width="1300" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="uploads-client" value="Browser / Traefik ingress&lt;br&gt;/api/uploads" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="40" y="120" width="160" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="uploads-svc" value="uploads Deployment — Go · schema uploads · API :8080 · metrics :9090" style="swimlane;startSize=26;fillColor=#F7F8FA;strokeColor=#D5DAE1;html=1;fontColor=#1B1F24;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="240" y="90" width="1180" height="700" as="geometry"/>
+        </mxCell>
+        <mxCell id="uploads-startup" value="startup: db.Connect → db.Migrate (uploads schema) → mkdir uploadDir → jwt → clients NSFW/gore → Serve" style="text;html=1;align=left;fontSize=11;fontColor=#5A626E;" vertex="1" parent="uploads-svc">
+          <mxGeometry x="20" y="28" width="1120" height="18" as="geometry"/>
+        </mxCell>
+        <mxCell id="uploads-upload" value="POST /uploads — handleUpload" style="swimlane;startSize=22;fillColor=#FFFFFF;strokeColor=#D5DAE1;html=1;fontColor=#1B1F24;fontStyle=1;" vertex="1" parent="uploads-svc">
+          <mxGeometry x="20" y="50" width="1140" height="360" as="geometry"/>
+        </mxCell>
+        <mxCell id="uploads-u1" value="POST /uploads&lt;br&gt;multipart field file&lt;br&gt;RequireAuth" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="uploads-upload">
+          <mxGeometry x="20" y="30" width="180" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="uploads-u2" value="MaxBytesReader 10 MiB&lt;br&gt;ParseMultipartForm&lt;br&gt;413 / 400" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="uploads-upload">
+          <mxGeometry x="220" y="30" width="210" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="uploads-u3" value="detectImageType&lt;br&gt;JPEG PNG GIF BMP WebP&lt;br&gt;ICO/TIFF/AVIF → 415" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="uploads-upload">
+          <mxGeometry x="450" y="30" width="220" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="uploads-u4" value="newID (32 hex)&lt;br&gt;parallel: NSFW + gore&lt;br&gt;+ hashMatcher" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="uploads-upload">
+          <mxGeometry x="690" y="30" width="200" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="uploads-u5" value="thresholds default 0.7&lt;br&gt;NSFW Porn+Hentai (Sexy opt-in)&lt;br&gt;gore graphic_violence+gore+blood" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="uploads-upload">
+          <mxGeometry x="910" y="30" width="210" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="uploads-e-u1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="uploads-upload" source="uploads-u1" target="uploads-u2">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="uploads-e-u2" value="bytes" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="uploads-upload" source="uploads-u2" target="uploads-u3">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="uploads-e-u3" value="supported" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="uploads-upload" source="uploads-u3" target="uploads-u4">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="uploads-e-u4" value="classify" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="uploads-upload" source="uploads-u4" target="uploads-u5">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="uploads-u6" value="reject&lt;br&gt;451 + moderation_audit" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEF3F2;strokeColor=#FECDCA;fontColor=#B42318;" vertex="1" parent="uploads-upload">
+          <mxGeometry x="20" y="150" width="220" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="uploads-u7" value="classifier error:&lt;br&gt;failOpen=false → 503 + audit&lt;br&gt;failOpen=true → store &#x27;unavailable&#x27; + 201" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="uploads-upload">
+          <mxGeometry x="260" y="150" width="320" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="uploads-u8" value="write file&lt;br&gt;/data/uploads/&amp;lt;id&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="uploads-upload">
+          <mxGeometry x="600" y="150" width="220" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="uploads-u9" value="INSERT uploads.images&lt;br&gt;201 {id, url}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="uploads-upload">
+          <mxGeometry x="840" y="150" width="280" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="uploads-e-u5" value="risky ≥ threshold" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;strokeColor=#B42318;fontColor=#B42318;" edge="1" parent="uploads-upload" source="uploads-u5" target="uploads-u6">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="uploads-e-u6" value="classifier error" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;strokeColor=#2E7D32;fontColor=#2E7D32;" edge="1" parent="uploads-upload" source="uploads-u5" target="uploads-u7">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="uploads-e-u7" value="accepted" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="uploads-upload" source="uploads-u7" target="uploads-u8">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="uploads-e-u8" value="stored" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="uploads-upload" source="uploads-u8" target="uploads-u9">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="uploads-hash" value="hashMatcher is a noop seam (no CSAM provider configured). hash error → 503 always; match → quarantine bytes + 451." style="rounded=1;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=10;spacingTop=6;fillColor=#FFFFFF;strokeColor=#D5DAE1;fontColor=#1B1F24;" vertex="1" parent="uploads-upload">
+          <mxGeometry x="20" y="260" width="530" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="uploads-statuses" value="upload outcomes: 201 created · 451 rejected/legal · 503 moderation unavailable (fail-closed) · 415 unsupported · 413 too large · 400 invalid · 500 storage/DB" style="rounded=1;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=10;spacingTop=6;fillColor=#FFFFFF;strokeColor=#D5DAE1;fontColor=#1B1F24;" vertex="1" parent="uploads-upload">
+          <mxGeometry x="570" y="260" width="550" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="uploads-read" value="GET /uploads/{id} — public image read" style="swimlane;startSize=22;fillColor=#FFFFFF;strokeColor=#D5DAE1;html=1;fontColor=#1B1F24;fontStyle=1;" vertex="1" parent="uploads-svc">
+          <mxGeometry x="20" y="430" width="1140" height="150" as="geometry"/>
+        </mxCell>
+        <mxCell id="uploads-r1" value="GET /uploads/{id}&lt;br&gt;/api/uploads/{id}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="uploads-read">
+          <mxGeometry x="20" y="30" width="220" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="uploads-r2" value="parse 32-hex id&lt;br&gt;SELECT filename, content_type&lt;br&gt;400 invalid · 404 missing · 500 DB" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="uploads-read">
+          <mxGeometry x="270" y="30" width="330" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="uploads-r3" value="http.ServeContent&lt;br&gt;Cache-Control: public, max-age=31536000, immutable&lt;br&gt;X-Content-Type-Options: nosniff" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="uploads-read">
+          <mxGeometry x="630" y="30" width="490" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="uploads-e-r1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="uploads-read" source="uploads-r1" target="uploads-r2">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="uploads-e-r2" value="file" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="uploads-read" source="uploads-r2" target="uploads-r3">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="uploads-mods" value="&lt;b&gt;Moderation sidecars&lt;/b&gt;&lt;br&gt;NSFWJS :8085 /metrics :9095&lt;br&gt;CLIP gore :8086 /metrics :9096&lt;br&gt;POST /classify raw bytes; 5s timeout; 1 MiB response cap; probabilities must sum 0.95–1.05" style="rounded=1;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=10;spacingTop=6;fillColor=#FFFFFF;strokeColor=#D5DAE1;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="1460" y="90" width="420" height="240" as="geometry"/>
+        </mxCell>
+        <mxCell id="uploads-pg" value="PostgreSQL 16 · schema uploads" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#F3EEFF;strokeColor=#B9A6F0;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="1460" y="350" width="420" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="uploads-t1" value="&lt;b&gt;uploads.images&lt;/b&gt;&lt;br&gt;id TEXT PK · user_id BIGINT&lt;br&gt;filename/content_type TEXT · size BIGINT&lt;br&gt;moderation_status TEXT DEFAULT &#x27;approved&#x27;&lt;br&gt;moderation_scores JSONB&lt;br&gt;created_at TIMESTAMPTZ&lt;br&gt;index user_id" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#FCFBFF;strokeColor=#B9A6F0;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="1460" y="435" width="420" height="115" as="geometry"/>
+        </mxCell>
+        <mxCell id="uploads-t2" value="&lt;b&gt;uploads.moderation_audit&lt;/b&gt;&lt;br&gt;id TEXT PK · user_id · filename · content_type · size&lt;br&gt;moderation_status · moderation_scores JSONB&lt;br&gt;reason TEXT · created_at&lt;br&gt;indexes user_id, created_at" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#FCFBFF;strokeColor=#B9A6F0;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="1460" y="560" width="420" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="uploads-t3" value="&lt;b&gt;uploads.quarantine&lt;/b&gt;&lt;br&gt;id TEXT PK · user_id · filename · content_type · size&lt;br&gt;matched_by TEXT · created_at&lt;br&gt;indexes user_id, created_at&lt;br&gt;&lt;br&gt;files: PVC /data/uploads; quarantine sibling /data/quarantine" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#FCFBFF;strokeColor=#B9A6F0;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="1460" y="670" width="420" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="uploads-e-client" value="/api/uploads" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="1" source="uploads-client" target="uploads-svc">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="uploads-e-nsfw" value="POST /classify (NSFW + gore, parallel)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;strokeColor=#2E7D32;fontColor=#2E7D32;" edge="1" parent="1" source="uploads-svc" target="uploads-mods">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="uploads-e-db" value="READ / WRITE uploads.*" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#B9A6F0;fontColor=#6B51A8;" edge="1" parent="1" source="uploads-svc" target="uploads-pg">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="uploads-fail" value="&lt;b&gt;Failure / degradation matrix&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;font color=#B42318&gt;&lt;b&gt;classifier return error / timeout&lt;/b&gt;&lt;/font&gt; → 503 + audit when MODERATION_FAIL_OPEN=false; 201 with moderation_status=unavailable when true&lt;br&gt;&lt;font color=#B42318&gt;&lt;b&gt;risky threshold met&lt;/b&gt;&lt;/font&gt; → 451 + moderation_audit (never stored in public tree)&lt;br&gt;&lt;font color=#B42318&gt;&lt;b&gt;filesystem/DB write error&lt;/b&gt;&lt;/font&gt; → 500; orphaned file removed on DB failure&lt;br&gt;&lt;font color=#B42318&gt;&lt;b&gt;unsupported/oversize/invalid&lt;/b&gt;&lt;/font&gt; → 415 / 413 / 400&lt;br&gt;&lt;font color=#2E7D32&gt;WebP[/green] is accepted by all three components; ICO/TIFF/AVIF are rejected at uploads before classification (neither tfjs nor sharp decodes ICO)." style="rounded=1;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=10;spacingTop=6;fillColor=#FFFFFF;strokeColor=#D5DAE1;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="40" y="810" width="900" height="250" as="geometry"/>
+        </mxCell>
+        <mxCell id="uploads-contract" value="&lt;b&gt;Contract&lt;/b&gt;&lt;br&gt;&lt;br&gt;POST /uploads requires JWT and multipart field file (≤10 MiB).&lt;br&gt;201 {id, url} · 451 rejected · 503 unavailable · 415 unsupported · 413 too large · 400 invalid · 500 storage/DB.&lt;br&gt;GET /uploads/{id} is public and immutable-cached.&lt;br&gt;&lt;br&gt;Metrics: service=uploads, endpoints upload_image/get_image/health." style="rounded=1;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=10;spacingTop=6;fillColor=#FFFFFF;strokeColor=#D5DAE1;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="960" y="810" width="460" height="250" as="geometry"/>
+        </mxCell>
+        <mxCell id="uploads-legend" value="&lt;b&gt;Legend&lt;/b&gt;&lt;br&gt;solid blue = sync HTTP / DB call&lt;br&gt;&lt;font color=#B42318&gt;red dashed = load-bearing failure (abort)&lt;/font&gt;&lt;br&gt;&lt;font color=#2E7D32&gt;green dashed = graceful degradation / fail-open&lt;/font&gt;&lt;br&gt;&lt;font color=#5A626E&gt;gray dashed = metrics scrape&lt;/font&gt;&lt;br&gt;purple = PostgreSQL / persistent storage&lt;br&gt;&lt;br&gt;&lt;b&gt;Runtime&lt;/b&gt;&lt;br&gt;HTTP :8080 · metrics :9090 · PVC /data/uploads 5Gi" style="rounded=1;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=10;spacingTop=6;fillColor=#FFF9DB;strokeColor=#E9D58A;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="1440" y="810" width="420" height="250" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="bario-moderation-001" name="moderation sidecars">
+    <mxGraphModel dx="1900" dy="1100" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1900" pageHeight="1100" math="0" shadow="0" adaptiveColors="auto">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="bario-moderation-001-title" value="Bario — moderation sidecars (NSFWJS + CLIP gore)" style="text;fontStyle=1;fontSize=16;html=1;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="40" y="10" width="1300" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="bario-moderation-001-sub" value="Stateless /classify sidecars called by uploads · shared image/format contract" style="text;fontSize=12;html=1;fontColor=#5A626E;" vertex="1" parent="1">
+          <mxGeometry x="40" y="40" width="1300" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="mod-nsfw" value="moderation (NSFWJS) — Node · HTTP :8085 · metrics :9095" style="swimlane;startSize=26;fillColor=#F7F8FA;strokeColor=#D5DAE1;html=1;fontColor=#1B1F24;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="90" width="880" height="620" as="geometry"/>
+        </mxCell>
+        <mxCell id="mod-nsfw-note" value="NSFWJS MobileNetV2 via TensorFlow.js · stateless · no database" style="text;html=1;align=left;fontSize=11;fontColor=#5A626E;" vertex="1" parent="mod-nsfw">
+          <mxGeometry x="20" y="28" width="840" height="18" as="geometry"/>
+        </mxCell>
+        <mxCell id="mod-nsfw-lane" value="POST /classify — NSFW image classification" style="swimlane;startSize=22;fillColor=#FFFFFF;strokeColor=#D5DAE1;html=1;fontColor=#1B1F24;fontStyle=1;" vertex="1" parent="mod-nsfw">
+          <mxGeometry x="20" y="50" width="840" height="330" as="geometry"/>
+        </mxCell>
+        <mxCell id="mod-n1" value="POST /classify&lt;br&gt;/api/moderation/classify&lt;br&gt;10 MiB max" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="mod-nsfw-lane">
+          <mxGeometry x="20" y="30" width="170" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="mod-n2" value="readImage&lt;br&gt;multipart field file&lt;br&gt;or raw image/*" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="mod-nsfw-lane">
+          <mxGeometry x="220" y="30" width="180" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="mod-n3" value="detectImageFormat&lt;br&gt;JPEG PNG GIF BMP WebP&lt;br&gt;else 400" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="mod-nsfw-lane">
+          <mxGeometry x="430" y="30" width="190" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="mod-n4" value="WebP → sharp&lt;br&gt;srgb raw tensor&lt;br&gt;else tfjs decode" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="mod-nsfw-lane">
+          <mxGeometry x="650" y="30" width="170" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="mod-e-n1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="mod-nsfw-lane" source="mod-n1" target="mod-n2">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="mod-e-n2" value="bytes" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="mod-nsfw-lane" source="mod-n2" target="mod-n3">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="mod-e-n3" value="format" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="mod-nsfw-lane" source="mod-n3" target="mod-n4">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="mod-n5" value="MobileNetV2&lt;br&gt;NSFWJS classify" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="mod-nsfw-lane">
+          <mxGeometry x="20" y="170" width="230" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="mod-n6" value="200 classes&lt;br&gt;Neutral, Drawing, Sexy,&lt;br&gt;Hentai, Porn" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="mod-nsfw-lane">
+          <mxGeometry x="280" y="170" width="290" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="mod-n7" value="400 decode/format&lt;br&gt;413 &gt;10 MiB&lt;br&gt;500 inference" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="mod-nsfw-lane">
+          <mxGeometry x="600" y="170" width="220" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="mod-e-n4" value="tensor" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="mod-nsfw-lane" source="mod-n4" target="mod-n5">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="mod-e-n5" value="probs" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="mod-nsfw-lane" source="mod-n5" target="mod-n6">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="mod-e-n6" value="error" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;strokeColor=#B42318;fontColor=#B42318;" edge="1" parent="mod-nsfw-lane" source="mod-n5" target="mod-n7">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="mod-nsfw-metrics" value="metrics :9095&lt;br&gt;service=moderation · endpoint=classify|health&lt;br&gt;actual status incl. 400/413/500" style="rounded=1;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=10;spacingTop=6;fillColor=#FFFFFF;strokeColor=#D5DAE1;fontColor=#1B1F24;" vertex="1" parent="mod-nsfw">
+          <mxGeometry x="20" y="400" width="840" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="mod-nsfw-health" value="GET /healthz (also /api/moderation/healthz) → 200 {status:ok}; model loads before listening" style="rounded=1;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=10;spacingTop=6;fillColor=#FFFFFF;strokeColor=#D5DAE1;fontColor=#1B1F24;" vertex="1" parent="mod-nsfw">
+          <mxGeometry x="20" y="490" width="840" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="mod-gore" value="moderation-gore (CLIP) — Python · HTTP :8086 · metrics :9096" style="swimlane;startSize=26;fillColor=#F7F8FA;strokeColor=#D5DAE1;html=1;fontColor=#1B1F24;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="960" y="90" width="880" height="620" as="geometry"/>
+        </mxCell>
+        <mxCell id="mod-gore-note" value="CLIP ViT-B/32 CPU PyTorch · zero-shot prompts · stateless · no database" style="text;html=1;align=left;fontSize=11;fontColor=#5A626E;" vertex="1" parent="mod-gore">
+          <mxGeometry x="20" y="28" width="840" height="18" as="geometry"/>
+        </mxCell>
+        <mxCell id="mod-gore-lane" value="POST /classify — gore/violence classification" style="swimlane;startSize=22;fillColor=#FFFFFF;strokeColor=#D5DAE1;html=1;fontColor=#1B1F24;fontStyle=1;" vertex="1" parent="mod-gore">
+          <mxGeometry x="20" y="50" width="840" height="330" as="geometry"/>
+        </mxCell>
+        <mxCell id="mod-g1" value="POST /classify&lt;br&gt;/api/moderation-gore/classify&lt;br&gt;10 MiB max" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="mod-gore-lane">
+          <mxGeometry x="20" y="30" width="180" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="mod-g2" value="read_image_bytes&lt;br&gt;multipart or raw&lt;br&gt;image/*" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="mod-gore-lane">
+          <mxGeometry x="230" y="30" width="180" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="mod-g3" value="Pillow decode&lt;br&gt;max 64M pixels&lt;br&gt;JPEG PNG GIF BMP WebP" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="mod-gore-lane">
+          <mxGeometry x="440" y="30" width="200" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="mod-g4" value="CLIP image + 5 prompts&lt;br&gt;softmax logits" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="mod-gore-lane">
+          <mxGeometry x="670" y="30" width="150" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="mod-e-g1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="mod-gore-lane" source="mod-g1" target="mod-g2">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="mod-e-g2" value="bytes" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="mod-gore-lane" source="mod-g2" target="mod-g3">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="mod-e-g3" value="RGB" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="mod-gore-lane" source="mod-g3" target="mod-g4">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="mod-g5" value="200 prompts&lt;br&gt;graphic violence, gore, blood,&lt;br&gt;a normal photo, everyday scene" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="mod-gore-lane">
+          <mxGeometry x="20" y="170" width="350" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="mod-g6" value="400 decode/format&lt;br&gt;413 &gt;10 MiB&lt;br&gt;500 inference" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FF;strokeColor=#9DB8F2;fontColor=#1B1F24;" vertex="1" parent="mod-gore-lane">
+          <mxGeometry x="400" y="170" width="220" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="mod-e-g4" value="probs" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="mod-gore-lane" source="mod-g4" target="mod-g5">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="mod-e-g5" value="error" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;strokeColor=#B42318;fontColor=#B42318;" edge="1" parent="mod-gore-lane" source="mod-g4" target="mod-g6">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="mod-gore-metrics" value="metrics :9096&lt;br&gt;service=moderation-gore · endpoint=classify|health&lt;br&gt;actual status incl. 400/413/500" style="rounded=1;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=10;spacingTop=6;fillColor=#FFFFFF;strokeColor=#D5DAE1;fontColor=#1B1F24;" vertex="1" parent="mod-gore">
+          <mxGeometry x="20" y="400" width="840" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="mod-gore-health" value="GET /healthz (also /api/moderation-gore/healthz) → 200 {status:ok}; CLIP loads before listening" style="rounded=1;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=10;spacingTop=6;fillColor=#FFFFFF;strokeColor=#D5DAE1;fontColor=#1B1F24;" vertex="1" parent="mod-gore">
+          <mxGeometry x="20" y="490" width="840" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="mod-shared" value="&lt;b&gt;Shared image contract (uploads ↔ sidecars)&lt;/b&gt;&lt;br&gt;JPEG, PNG, GIF, BMP, WebP are accepted by uploads, NSFWJS and CLIP. ICO/TIFF/AVIF are rejected at uploads before any call (Go sniffs ICO as image/x-icon; neither tfjs nor sharp decodes it). WebP is special-cased in NSFWJS via sharp because tfjs cannot decode it; CLIP uses Pillow. Uploads calls both /classify endpoints concurrently with a 5s timeout and 1 MiB response cap; probabilities must sum 0.95–1.05 or uploads treats the classifier as failed. Reject threshold default 0.7 for both." style="rounded=1;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=10;spacingTop=6;fillColor=#FFFFFF;strokeColor=#D5DAE1;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="40" y="740" width="900" height="300" as="geometry"/>
+        </mxCell>
+        <mxCell id="mod-caller" value="&lt;b&gt;Failure / degradation&lt;/b&gt;&lt;br&gt;Sidecar 400/413/500 → uploads sees classifier error. With MODERATION_FAIL_OPEN=false (default) uploads returns 503 and audits; with true it stores moderation_status=unavailable and returns 201. Threshold rejection is uploads&#x27; 451, not a sidecar status. CLIP is zero-shot: out-of-distribution/noisy images can produce overconfident scores near the threshold; use the audit scores and thresholds, do not treat scores as calibrated forensic truth. No DB writes in either sidecar." style="rounded=1;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=10;spacingTop=6;fillColor=#FFFFFF;strokeColor=#D5DAE1;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="960" y="740" width="460" height="300" as="geometry"/>
+        </mxCell>
+        <mxCell id="moderation-legend" value="&lt;b&gt;Legend&lt;/b&gt;&lt;br&gt;solid blue = sync HTTP / DB call&lt;br&gt;&lt;font color=#B42318&gt;red dashed = load-bearing failure (abort)&lt;/font&gt;&lt;br&gt;&lt;font color=#2E7D32&gt;green dashed = graceful degradation / fail-open&lt;/font&gt;&lt;br&gt;&lt;font color=#5A626E&gt;gray dashed = metrics scrape&lt;/font&gt;&lt;br&gt;purple = PostgreSQL / persistent storage&lt;br&gt;&lt;br&gt;&lt;b&gt;Runtime&lt;/b&gt;&lt;br&gt;NSFWJS :8085/:9095 · CLIP :8086/:9096 · ClusterIP only" style="rounded=1;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=10;spacingTop=6;fillColor=#FFF9DB;strokeColor=#E9D58A;fontColor=#1B1F24;" vertex="1" parent="1">
+          <mxGeometry x="1440" y="740" width="420" height="250" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
 </mxfile>
